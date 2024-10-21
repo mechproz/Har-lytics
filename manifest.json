@@ -1,0 +1,21 @@
+{
+    "manifest_version": 3,
+  "name": "HAR Data Viewer",
+  "version": "1.0",
+  "description": "A Chrome DevTools extension to capture and display network HAR data.",
+  "permissions": [
+    "storage"
+  ],
+  "permissions": [
+    "webRequest",              
+    "webRequestBlocking",      
+    "storage"                  
+  ],
+  "devtools_page": "devtools.html",
+  "icons": {
+    "16": "assets/icon.png",
+    "48": "assets/icon.png",
+    "128": "assets/icon.png"
+  }
+  }
+  
