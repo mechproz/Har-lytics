@@ -17,3 +17,17 @@ body {
     background-color: #eef;
   }
   
+  #data-display {
+    margin-top: 20px;
+    font-family: Arial, sans-serif;
+}
+
+.link-info {
+    border-bottom: 1px solid #ddd;
+    padding: 10px;
+}
+
+.link-info p {
+    margin: 0;
+    padding: 4px 0;
+}

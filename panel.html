@@ -1,20 +1,26 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Network Request Viewer</title>
-  <style>
-    .network-entry {
-      margin-bottom: 10px;
-      padding: 5px;
-      border-bottom: 1px solid #ccc;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Network Request Flow Diagram</title>
+    <style>
+        #diagram-container {
+            width: 100%;
+            height: 500px;
+            border: 1px solid #ddd;
+            overflow: hidden;
+        }
+    </style>    
 </head>
 <body>
-  <h1>Network Requests</h1>
-  <div id="network-entries"></div>  <!-- Div to hold network requests -->
-  <script src="panel.js"></script>
+    <h2>Network Request Flow</h2>
+    <button id="refresh-diagram">Refresh Diagram</button>
+    <div id="diagram-container" style="width: 600px; height: 600px;"></div>
+    <div id="data-display" style="padding: 10px; overflow:auto;border-top: 1px solid #ccc;">
+        
+    </div>
+    <script src="libs/d3.v7.js"></script>
+    <script src="panel.js"></script>
 </body>
 </html>
