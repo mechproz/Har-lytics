@@ -1,20 +1,48 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Network Request Viewer</title>
-  <style>
-    .network-entry {
-      margin-bottom: 10px;
-      padding: 5px;
-      border-bottom: 1px solid #ccc;
-    }
-  </style>
+    <title>Network Panel</title>
+    <style>
+        /* Styles for coloring and formatting */
+        .get-color { color: green; }
+        .post-color { color: blue; }
+        .xss-issue { color: red; font-weight: bold; }
+        .details-content { display: none; }
+        .network-entry:hover .details-content { display: block; }
+        .filter-container {
+            margin-bottom: 10px;
+        }
+    </style>
 </head>
 <body>
-  <h1>Network Requests</h1>
-  <div id="network-entries"></div>  <!-- Div to hold network requests -->
-  <script src="panel.js"></script>
+    <h1>Network Requests</h1>
+    <div class="filter-container">
+        <label for="requestTypeFilter">Filter by Request Type:</label>
+        <select id="requestTypeFilter">
+            <option value="all">All</option>
+            <option value="GET">GET</option>
+            <option value="POST">POST</option>
+            <!-- Add other methods as needed -->
+        </select>
+
+        <label for="xssFilter">Filter by XSS Detection:</label>
+        <select id="xssFilter">
+            <option value="all">All</option>
+            <option value="xss">XSS Detected</option>
+            <option value="no-xss">No XSS Detected</option>
+        </select>
+    </div>
+
+    <table id="network-table" border="1">
+        <thead>
+            <tr>
+                <th>Request Type</th>
+                <th>Details</th>
+                <th>XSS Patterns Detected</th>
+            </tr>
+        </thead>
+        <tbody id="network-entries"></tbody>
+    </table>
+    <script src="panel.js"></script>
 </body>
 </html>
