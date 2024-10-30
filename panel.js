@@ -9,7 +9,8 @@ chrome.devtools.network.onRequestFinished.addListener((request) => {
     networkRequests.push({
         source: document.location.hostname, // Source page, or customize to capture a specific origin
         target: new URL(request.request.url).hostname, // Destination host
-        count: 1 // Initialize a count property to track requests
+        count: 1, // Initialize a count property to track requests
+        destIP: request.serverIPAddress || "N/A" // Capture destination IP if available
     });
 });
 
@@ -38,7 +39,7 @@ function prepareData() {
         if (linksMap[linkKey]) {
             linksMap[linkKey].count += 1;
         } else {
-            linksMap[linkKey] = { source: sourceHost, target: targetHost, count: 1 };
+            linksMap[linkKey] = { source: sourceHost, target: targetHost, count: 1, destIP: req.destIP };
         }
     });
 
@@ -135,19 +136,21 @@ function renderDiagram() {
     }
 
     // Populate #data-display with textual data
-    const display = document.getElementById("data-display");
-    display.innerHTML = "<h3>Network Request Details</h3>";
+const display = document.getElementById("data-display");
+display.innerHTML = "<h3>Network Request Details</h3>";
 
-    links.forEach(link => {
-        const linkInfo = document.createElement("div");
-        linkInfo.classList.add("link-info");
-        linkInfo.innerHTML = `
-            <p><strong>Origin:</strong> ${link.source}</p>
-            <p><strong>Destination:</strong> ${link.target}</p>
-            <p><strong>Request Count:</strong> ${link.count}</p>
-        `;
-        display.appendChild(linkInfo);
-    });
+links.forEach(link => {
+    const linkInfo = document.createElement("div");
+    linkInfo.classList.add("link-info");
+    linkInfo.innerHTML = `
+        <p><strong>Origin:</strong> ${link.source.id}</p>
+        <p><strong>Destination:</strong> ${link.target.id}</p>
+        <p><strong>Destination IP:</strong> ${link.destIP}</p>
+        <p><strong>Request Count:</strong> ${link.count}</p>
+    `;
+    display.appendChild(linkInfo);
+});
+
 }
 
 // Refresh button to re-render the diagram with new data
