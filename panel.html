@@ -27,6 +27,13 @@
       padding: 5px;
       border-bottom: 1px solid #ccc;
     }
+    .xss-issue {
+      color: red;
+      font-weight: bold;
+    }
+    .details-content {
+      display: none; /* Collapsible content hidden by default */
+    }
   </style>
 </head>
 <body>
@@ -57,8 +64,17 @@
 
   <!-- XSS Detection View -->
   <div id="xss-detection" class="view-section">
-    <h2>XSS Detection (Tee Kiat)</h2>
-    <div id="network-entries-xss"></div>
+    <h2>XSS Detection</h2>
+    <table id="xss-detection-table" border="1">
+      <thead>
+        <tr>
+          <th>URL</th>
+          <th>XSS Patterns Detected</th>
+          <th>Details</th>
+        </tr>
+      </thead>
+      <tbody id="xss-entries"></tbody>
+    </table>
   </div>
 
   <!-- Threat Correlation View -->

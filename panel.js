@@ -1,5 +1,28 @@
 console.log("DevTools panel loaded");
 
+// XSS detection patterns
+const XSS_PATTERNS = [
+    /<script\b[^>]*>(.*?)<\/script>/gi,
+    /javascript:/gi,
+    /\bon\w+=\s*(['"]).*?\1/gi,
+    /\beval\s*\(/gi,
+    /\bdocument\.cookie\b/gi
+];
+
+// Function to detect XSS patterns in text
+function detectXSS(text) {
+    let issues = [];
+    const decodedText = decodeURIComponent(text);
+    [text, decodedText].forEach(body => {
+        XSS_PATTERNS.forEach(pattern => {
+            if (pattern.test(body)) {
+                issues.push(pattern.toString());
+            }
+        });
+    });
+    return issues;
+}
+
 // Wait until the DOM is fully loaded
 document.addEventListener("DOMContentLoaded", () => {
     // Function to toggle views
@@ -40,9 +63,7 @@ document.addEventListener("DOMContentLoaded", () => {
     chrome.devtools.network.onRequestFinished.addListener((request) => {
         // Only show in the network-requests view
         if (!document.getElementById("network-requests").classList.contains("active")) return;
-
         console.log("Request captured:", request);
-
         const entryDiv = document.createElement("div");
         entryDiv.classList.add("network-entry");
 
@@ -93,11 +114,56 @@ document.addEventListener("DOMContentLoaded", () => {
         document.getElementById("network-entries").appendChild(entryDiv);
     });
 
-    // XSS Detection Tab - Placeholder for XSS detection results
-    document.getElementById("network-entries-xss").innerHTML = `
-        <p>Placeholder: Results of XSS detection (e.g., flagged scripts, suspicious content).</p>
-        <p>Implement: Regular expressions to scan response bodies for potential XSS vectors.</p>
-    `;
+    // XSS Detection Tab
+    chrome.devtools.network.onRequestFinished.addListener((request) => {
+        if (!document.getElementById("xss-detection").classList.contains("active")) return;
+
+        request.getContent((content) => {
+            const xssIssues = detectXSS(content || "") || detectXSS(request.request.postData?.text || "");
+
+            if (xssIssues.length > 0) {
+                const entryRow = document.createElement("tr");
+
+                // URL Column
+                const urlCol = document.createElement("td");
+                urlCol.textContent = request.request.url;
+                entryRow.appendChild(urlCol);
+
+                // Detected Patterns Column
+                const xssCol = document.createElement("td");
+                xssCol.innerHTML = `Patterns: ${xssIssues.join(", ")}`;
+                xssCol.classList.add("xss-issue");
+                entryRow.appendChild(xssCol);
+
+                // Details Column with Toggle
+                const detailsCol = document.createElement("td");
+                const detailsContent = document.createElement("div");
+                detailsContent.classList.add("details-content");
+                detailsContent.style.display = "none";
+
+                detailsContent.innerHTML = `
+                    <strong>Request URL:</strong> ${request.request.url}<br>
+                    <strong>Request Method:</strong> ${request.request.method}<br>
+                    <strong>Request Headers:</strong> ${request.request.headers.map(header => `${header.name}: ${header.value}`).join("<br>")}<br>
+                    <strong>Response Headers:</strong> ${request.response.headers.map(header => `${header.name}: ${header.value}`).join("<br>")}<br>
+                    <strong>Request Body:</strong> ${request.request.postData?.text || "No body"}<br>
+                    <strong>Response Body:</strong> ${content || "No content"}
+                `;
+
+                const expandButton = document.createElement("button");
+                expandButton.textContent = "Expand";
+                expandButton.addEventListener("click", () => {
+                    detailsContent.style.display = detailsContent.style.display === "none" ? "block" : "none";
+                });
+
+                detailsCol.appendChild(expandButton);
+                detailsCol.appendChild(detailsContent);
+                entryRow.appendChild(detailsCol);
+
+                document.getElementById("xss-entries").appendChild(entryRow);
+            }
+        });
+    });
 
     // Threat Correlation Tab - Placeholder for threat intelligence matches
     document.getElementById("network-entries-threat").innerHTML = `
