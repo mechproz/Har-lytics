@@ -3,92 +3,36 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>HAR Data Viewer</title>
+  <title>Network Request Viewer</title>
   <style>
-    .tab-button {
-      padding: 10px;
-      cursor: pointer;
-      border: 1px solid #ccc;
-      background-color: #f5f5f5;
-      margin-right: 5px;
-    }
-    .tab-button.active {
-      background-color: #ddd;
-    }
-    .view-section {
-      display: none; /* Hidden by default */
-      margin-top: 20px;
-    }
-    .view-section.active {
-      display: block; /* Show the active section */
-    }
     .network-entry {
       margin-bottom: 10px;
       padding: 5px;
       border-bottom: 1px solid #ccc;
     }
+    #malicious-alert {
+      color: red;
+      font-weight: bold;
+      display: none; /* Hidden by default */
+      margin-bottom: 15px;
+    }
+    #malicious-list {
+      color: red;
+      font-weight: bold;
+      margin-top: 10px;
+      list-style-type: none;
+      padding-left: 0;
+    }
   </style>
 </head>
 <body>
-  <h1>Network Request Viewer</h1>
+  <h1>Network Requests</h1>
 
-  <!-- Buttons to toggle between views -->
-  <div id="tabs">
-    <button id="overview-tab" class="tab-button">Overview</button>
-    <button id="network-requests-tab" class="tab-button active">Network Requests</button>
-    <button id="xss-detection-tab" class="tab-button">XSS Detection</button>
-    <button id="threat-correlation-tab" class="tab-button">Threat Correlation</button>
-    <button id="flow-diagrams-tab" class="tab-button">Flow Diagrams</button>
-    <button id="analysis-overview-tab" class="tab-button">Analysis Overview</button>
-    <button id="report-config-tab" class="tab-button">Report Config</button>
-  </div>
+  <!-- This div will display the malicious IP warning only when a match is found -->
+  <div id="malicious-alert">Connected to known malicious site(s):</div>
+  <ul id="malicious-list"></ul>
 
-  <!-- Overview View -->
-  <div id="overview" class="view-section">
-    <h2>Overview</h2>
-    <div id="network-entries-overview"></div>
-  </div>
-
-  <!-- Network Requests View -->
-  <div id="network-requests" class="view-section active">
-    <h2>Network Requests</h2>
-    <div id="network-entries"></div> <!-- Div to hold network requests -->
-  </div>
-
-  <!-- XSS Detection View -->
-  <div id="xss-detection" class="view-section">
-    <h2>XSS Detection (Tee Kiat)</h2>
-    <div id="network-entries-xss"></div>
-  </div>
-
-  <!-- Threat Correlation View -->
-  <div id="threat-correlation" class="view-section">
-    <h2>Threat Correlation (Cheryl)</h2>
-    <div id="network-entries-threat"></div>
-  </div>
-
-  <!-- Flow Diagrams View -->
-  <div id="flow-diagrams" class="view-section">
-    <h2>Flow Diagrams (James)</h2>
-    <div id="network-entries-flow"></div>
-  </div>
-
-  <!-- Analysis Overview View -->
-  <div id="analysis-overview" class="view-section">
-    <h2>Analysis Overview</h2>
-    <div id="network-entries-analysis"></div>
-  </div>
-
-  <!-- Report Config View -->
-  <div id="report-config" class="view-section">
-    <h2>Report Configuration (Keegan)</h2>
-    <label><input type="checkbox" id="include-overview" checked> Include Overview</label><br>
-    <label><input type="checkbox" id="include-xss" checked> Include XSS Detection</label><br>
-    <label><input type="checkbox" id="include-threats" checked> Include Threat Correlation</label><br>
-    <label><input type="checkbox" id="include-flow" checked> Include Flow Diagrams</label><br>
-    <button id="export-full-report">Generate Full Report</button>
-  </div>
-
+  <div id="network-entries"></div> <!-- Div to hold network requests -->
   <script src="panel.js"></script>
 </body>
 </html>
