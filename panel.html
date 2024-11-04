@@ -40,6 +40,19 @@
       border: 1px solid #ddd;
       overflow: hidden;
     }
+    #malicious-alert {
+      color: red;
+      font-weight: bold;
+      display: none; /* Hidden by default */
+      margin-bottom: 15px;
+    }
+    #malicious-list {
+      color: red;
+      font-weight: bold;
+      margin-top: 10px;
+      list-style-type: none;
+      padding-left: 0;
+    }
   </style>
 </head>
 <body>
@@ -85,8 +98,10 @@
 
   <!-- Threat Correlation View -->
   <div id="threat-correlation" class="view-section">
-    <h2>Threat Correlation (Cheryl)</h2>
-    <div id="network-entries-threat"></div>
+    <h2>Threat Correlation</h2>
+    <!-- This div will display the malicious IP warning only when a match is found -->
+    <div id="malicious-alert">Connected to known malicious site(s):</div>
+    <ul id="malicious-list"></ul>
   </div>
 
   <!-- Flow Diagrams View -->

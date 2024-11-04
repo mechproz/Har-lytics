@@ -38,6 +38,55 @@ function detectXSS(text) {
     return issues;
 }
 
+// Path to the malicious IPs file
+const maliciousIPsPath = chrome.runtime.getURL("data/malicious_ips.txt");
+
+// Function to fetch and parse the malicious IPs from the file
+async function fetchMaliciousIPs() {
+    try {
+        const response = await fetch(maliciousIPsPath);
+        const text = await response.text();
+        return text.split("\n").map(ip => ip.trim()).filter(ip => ip);
+    } catch (error) {
+        console.error("Error fetching malicious IPs:", error);
+        return [];
+    }
+}
+
+// Initialize malicious IP list and a Map to track detected IPs and their associated requests
+let maliciousIPs = [];
+const detectedIPs = new Map();  // Map to group requests by IP
+
+// Fetch malicious IPs on script load
+fetchMaliciousIPs().then(ips => {
+    maliciousIPs = ips;
+    console.log("Loaded Malicious IPs:", maliciousIPs);
+});
+
+// Function to display the malicious IPs, methods, and URLs in the HTML
+function displayMaliciousIps() {
+    const maliciousList = document.getElementById('malicious-list');
+    if (!maliciousList) return;
+
+    maliciousList.innerHTML = ""; // Clear previous entries
+
+    detectedIPs.forEach((requests, ip) => {
+        const ipHeader = document.createElement('li');
+        ipHeader.innerHTML = `<strong>IP:</strong> ${ip}`;
+        ipHeader.style.marginTop = '10px';
+        maliciousList.appendChild(ipHeader);
+
+        requests.forEach(({ method, url }) => {
+            const requestItem = document.createElement('li');
+            requestItem.innerHTML = `&nbsp;&nbsp;<strong>Method:</strong> ${method}<br>&nbsp;&nbsp;<strong>URL:</strong> ${url}<br><br>`;
+            maliciousList.appendChild(requestItem);
+        });
+
+        const gap = document.createElement('br');
+        maliciousList.appendChild(gap);
+    });
+}
+
 // Wait until the DOM is fully loaded
 document.addEventListener("DOMContentLoaded", () => {
     // Function to toggle views
@@ -189,6 +238,30 @@ document.addEventListener("DOMContentLoaded", () => {
                     document.getElementById("xss-entries").appendChild(entryRow);
                 }
             });
+        }
+
+        // Malicious IP detection
+        const remoteIPAddress = request.serverIPAddress || "N/A";
+        const method = request.request.method;
+        const url = request.request.url;
+
+        if (maliciousIPs.includes(remoteIPAddress)) {
+            console.warn("Malicious IP detected:", remoteIPAddress);
+
+            // Add to detectedIPs Map
+            if (!detectedIPs.has(remoteIPAddress)) {
+                detectedIPs.set(remoteIPAddress, []);
+            }
+            detectedIPs.get(remoteIPAddress).push({ method, url });
+
+            // Show the alert message
+            const maliciousAlertDiv = document.getElementById('malicious-alert');
+            if (maliciousAlertDiv) {
+                maliciousAlertDiv.style.display = 'block';
+            }
+
+            // Update the display
+            displayMaliciousIps();
         }
     });
 
@@ -344,12 +417,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Refresh button to re-render the diagram with new data
     document.getElementById("refresh-diagram").addEventListener("click", renderDiagram);
-
-    // Threat Correlation Tab - Placeholder for threat intelligence matches
-    document.getElementById("network-entries-threat").innerHTML = `
-        <p>Placeholder: List of requests matched with threat intelligence data.</p>
-        <p>Implement: Cross-reference IPs and domains with a blacklist or threat feed.</p>
-    `;
 
     // Analysis Overview Tab - Placeholder for aggregated analysis results
     document.getElementById("network-entries-analysis").innerHTML = `
