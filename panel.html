@@ -65,7 +65,6 @@
     <button id="xss-detection-tab" class="tab-button">XSS Detection</button>
     <button id="threat-correlation-tab" class="tab-button">Threat Correlation</button>
     <button id="flow-diagrams-tab" class="tab-button">Flow Diagrams</button>
-    <button id="analysis-overview-tab" class="tab-button">Analysis Overview</button>
     <button id="report-config-tab" class="tab-button">Report Config</button>
   </div>
 
@@ -121,20 +120,14 @@
     <div id="data-display" style="padding: 10px; overflow:auto;border-top: 1px solid #ccc;"></div>
   </div>
 
-  <!-- Analysis Overview View -->
-  <div id="analysis-overview" class="view-section">
-    <h2>Analysis Overview</h2>
-    <div id="network-entries-analysis"></div>
-  </div>
-
   <!-- Report Config View -->
   <div id="report-config" class="view-section">
-    <h2>Report Configuration (Keegan)</h2>
-    <label><input type="checkbox" id="include-overview" checked> Include Overview</label><br>
-    <label><input type="checkbox" id="include-xss" checked> Include XSS Detection</label><br>
-    <label><input type="checkbox" id="include-threats" checked> Include Threat Correlation</label><br>
-    <label><input type="checkbox" id="include-flow" checked> Include Flow Diagrams</label><br>
-    <button id="export-full-report">Generate Full Report</button>
+      <h2>Report Configuration</h2>
+      <label><input type="checkbox" id="include-network-requests" checked> Include Overview</label><br>
+      <label><input type="checkbox" id="include-xss" checked> Include XSS Detection</label><br>
+      <label><input type="checkbox" id="include-threats" checked> Include Threat Correlation</label><br>
+      <label><input type="checkbox" id="include-flow" checked> Include Flow Diagrams</label><br>
+      <button id="export-full-report">Generate Full Report</button>
   </div>
 
   <script src="libs/d3.v7.js"></script>

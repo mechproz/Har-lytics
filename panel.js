@@ -1,13 +1,23 @@
+// ====================================================
+// DevTools Panel Initialization
+// ====================================================
+
 console.log("DevTools panel loaded");
 
-// Array to store network requests
-const networkRequests = []; // For saving HAR files
-const flowData = [];        // For flow diagrams and other custom data
+// ====================================================
+// Global Variables and Initialization
+// ====================================================
 
+// Array to store network requests for HAR saving
+const networkRequests = [];
+// Array to store data for flow diagrams and other custom purposes
+const flowData = [];
+// Global array to store detected XSS issues
+const xssIssuesGlobal = [];
 // Variable to store the inspected page's hostname
 let inspectedHostname = null;
 
-// Get the hostname of the inspected window
+// Fetch the hostname of the inspected window
 chrome.devtools.inspectedWindow.eval("window.location.hostname", function(result, isException) {
     if (!isException) {
         inspectedHostname = result;
@@ -16,7 +26,11 @@ chrome.devtools.inspectedWindow.eval("window.location.hostname", function(result
     }
 });
 
-// XSS detection patterns
+// ====================================================
+// XSS Detection Setup
+// ====================================================
+
+// Regular expressions to detect potential XSS patterns
 const XSS_PATTERNS = [
     /<script\b[^>]*>(.*?)<\/script>/gi,
     /javascript:/gi,
@@ -25,7 +39,7 @@ const XSS_PATTERNS = [
     /\bdocument\.cookie\b/gi
 ];
 
-// Function to detect XSS patterns in text
+// Function to detect XSS patterns in a given text
 function detectXSS(text) {
     let issues = [];
     const decodedText = decodeURIComponent(text);
@@ -38,6 +52,10 @@ function detectXSS(text) {
     });
     return issues;
 }
+
+// ====================================================
+// Malicious IP Detection Setup
+// ====================================================
 
 // Path to the malicious IPs file
 const maliciousIPsPath = chrome.runtime.getURL("data/malicious_ips.txt");
@@ -87,6 +105,10 @@ function displayMaliciousIps() {
         maliciousList.appendChild(gap);
     });
 }
+
+// ====================================================
+// HAR File Saving Functions
+// ====================================================
 
 // Initialize variables for automatic saving
 let autoSaveIntervalId = null;
@@ -162,6 +184,10 @@ function stopAutoSave() {
     }
 }
 
+// ====================================================
+// DOM Event Listeners and Interaction Setup
+// ====================================================
+
 // Wait until the DOM is fully loaded
 document.addEventListener("DOMContentLoaded", () => {
     // Function to toggle views
@@ -192,8 +218,11 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById('xss-detection-tab').addEventListener('click', () => showView('xss-detection'));
     document.getElementById('threat-correlation-tab').addEventListener('click', () => showView('threat-correlation'));
     document.getElementById('flow-diagrams-tab').addEventListener('click', () => showView('flow-diagrams'));
-    document.getElementById('analysis-overview-tab').addEventListener('click', () => showView('analysis-overview'));
     document.getElementById('report-config-tab').addEventListener('click', () => showView('report-config'));
+
+    // ====================================================
+    // HAR Saving Event Listeners
+    // ====================================================
 
     // Event listener for manual save button
     const saveHarButton = document.getElementById("save-har");
@@ -233,6 +262,10 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
+    // ====================================================
+    // Network Request Capture and Processing
+    // ====================================================
+
     // Capture network requests
     chrome.devtools.network.onRequestFinished.addListener((request) => {
         // Store the full request object for HAR saving
@@ -245,6 +278,10 @@ document.addEventListener("DOMContentLoaded", () => {
             count: 1, // Initialize a count property to track requests
             destIP: request.serverIPAddress || "N/A" // Capture destination IP if available
         });
+
+        // ====================================================
+        // Network Requests Tab Display
+        // ====================================================
 
         // Network Requests Tab - Display individual network requests
         if (document.getElementById("network-requests").classList.contains("active")) {
@@ -299,12 +336,23 @@ document.addEventListener("DOMContentLoaded", () => {
             document.getElementById("network-entries").appendChild(entryDiv);
         }
 
+        // ====================================================
+        // XSS Detection Processing
+        // ====================================================
+
         // XSS Detection Tab
         if (document.getElementById("xss-detection").classList.contains("active")) {
             request.getContent((content) => {
                 const xssIssues = detectXSS(content || "") || detectXSS(request.request.postData?.text || "");
 
                 if (xssIssues.length > 0) {
+                    // Push the issue into the global array
+                    xssIssuesGlobal.push({
+                        url: request.request.url,
+                        patterns: xssIssues
+                    });
+                    console.log("XSS Issue Detected:", xssIssuesGlobal);
+
                     const entryRow = document.createElement("tr");
 
                     // URL Column
@@ -348,6 +396,10 @@ document.addEventListener("DOMContentLoaded", () => {
             });
         }
 
+        // ====================================================
+        // Threat Detection
+        // ====================================================
+
         // Malicious IP detection
         const remoteIPAddress = request.serverIPAddress || "N/A";
         const method = request.request.method;
@@ -372,6 +424,10 @@ document.addEventListener("DOMContentLoaded", () => {
             displayMaliciousIps();
         }
     });
+
+    // ====================================================
+    // Flow Diagram Preparation and Rendering
+    // ====================================================
 
     // Function to process data into nodes and links for D3.js
     function prepareData() {
@@ -526,14 +582,151 @@ document.addEventListener("DOMContentLoaded", () => {
     // Refresh button to re-render the diagram with new data
     document.getElementById("refresh-diagram").addEventListener("click", renderDiagram);
 
-    // Report Config Tab - Placeholder for report generation options
+    // ====================================================
+    // Report Generation Functionality
+    // ====================================================
+
+    // Report Generation Tab
     document.getElementById("report-config").innerHTML += `
-        <p>Placeholder: Options to select which sections to include in the final report.</p>
-        <p>Implement: Gather data from each selected section and format it for download.</p>
+        <p>Select which sections to include in the report.</p>
     `;
 
-    // Placeholder function for report generation button
-    document.getElementById("export-full-report").addEventListener("click", () => {
-        console.log("Generate Full Report button clicked");
-    });
+    function generateReport() {
+        try {
+            // Collect user preferences for report sections
+            const includeNetworkRequests = document.getElementById('include-network-requests').checked; // Corrected ID for the Network Requests tab
+            const includeXSS = document.getElementById('include-xss').checked;
+            const includeThreats = document.getElementById('include-threats').checked;
+            const includeFlow = document.getElementById('include-flow').checked;
+
+            // Initialize the report content
+            let reportContent = `
+            <html>
+            <head>
+                <title>Network Analysis Report</title>
+                <style>
+                    body { font-family: Arial, sans-serif; margin: 20px; }
+                    h1, h2, h3 { color: #333; }
+                    table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+                    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+                    th { background-color: #f5f5f5; }
+                    ul { list-style-type: none; padding: 0; }
+                    li { margin-bottom: 5px; }
+                </style>
+            </head>
+            <body>
+            <h1>Network Analysis Report</h1>
+            <p>Generated on: ${new Date().toLocaleString()}</p>
+            `;
+
+            // Include Network Requests Summary
+            if (includeNetworkRequests) {
+                const totalRequests = networkRequests.length;
+
+                // Aggregate data for HTTP methods and status codes
+                const methodCounts = {};
+                const statusCounts = {};
+                networkRequests.forEach(request => {
+                    const method = request.request.method;
+                    const status = request.response.status;
+
+                    methodCounts[method] = (methodCounts[method] || 0) + 1;
+                    statusCounts[status] = (statusCounts[status] || 0) + 1;
+                });
+
+                reportContent += `<h2>Network Requests</h2>`;
+                reportContent += `<p>Total Requests: ${totalRequests}</p>`;
+                reportContent += `<h3>HTTP Methods</h3><ul>`;
+                for (const [method, count] of Object.entries(methodCounts)) {
+                    reportContent += `<li>${method}: ${count}</li>`;
+                }
+                reportContent += `</ul><h3>Status Codes</h3><ul>`;
+                for (const [status, count] of Object.entries(statusCounts)) {
+                    reportContent += `<li>${status}: ${count}</li>`;
+                }
+                reportContent += `</ul>`;
+            }
+
+            // Include XSS Detection
+            if (includeXSS) {
+                const xssIssues = networkRequests.flatMap(request => detectXSS(request.request.postData?.text || ""));
+
+                if (xssIssuesGlobal.length > 0) {
+                    reportContent += `<h2>XSS Detection</h2>`;
+                    reportContent += `<table>
+                        <tr>
+                            <th>URL</th>
+                            <th>Detected Patterns</th>
+                        </tr>`;
+                    xssIssuesGlobal.forEach(issue => {
+                        reportContent += `<tr>
+                            <td>${issue.url}</td>
+                            <td>${issue.patterns.join(", ")}</td>
+                        </tr>`;
+                    });
+                    reportContent += `</table>`;
+                } else {
+                    reportContent += `<p>No XSS issues detected.</p>`;
+                }
+            }
+
+            // Include Malicious IPs
+            if (includeThreats) {
+                reportContent += `<h2>Malicious IPs</h2>`;
+                if (detectedIPs.size > 0) {
+                    reportContent += `<ul>`;
+                    detectedIPs.forEach((requests, ip) => {
+                        reportContent += `<li><strong>${ip}</strong><ul>`;
+                        requests.forEach(req => {
+                            reportContent += `<li>${req.method}: ${req.url}</li>`;
+                        });
+                        reportContent += `</ul></li>`;
+                    });
+                    reportContent += `</ul>`;
+                } else {
+                    reportContent += `<p>No malicious IPs detected.</p>`;
+                }
+            }
+
+            // Include Flow Diagrams
+            if (includeFlow) {
+                reportContent += `<h2>Flow Diagram Data</h2>`;
+                const { nodes, links } = prepareData();
+
+                reportContent += `<h3>Nodes</h3><ul>`;
+                nodes.forEach(node => {
+                    reportContent += `<li>${node.id}</li>`;
+                });
+                reportContent += `</ul><h3>Links</h3><table>
+                <tr><th>Source</th><th>Target</th><th>Request Count</th><th>Destination IP</th></tr>`;
+                links.forEach(link => {
+                    reportContent += `<tr>
+                        <td>${link.source}</td>
+                        <td>${link.target}</td>
+                        <td>${link.count}</td>
+                        <td>${link.destIP}</td>
+                    </tr>`;
+                });
+                reportContent += `</table>`;
+            }
+
+            // Finalize and close the HTML content
+            reportContent += `</body></html>`;
+
+            // Create and download the report as an HTML file
+            const blob = new Blob([reportContent], { type: "text/html" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "network_analysis_report.html";
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error("Error generating report:", error);
+            alert("An error occurred while generating the report. Check the console for details.");
+        }
+    }
+
+    // Event listener for report generation button
+    document.getElementById("export-full-report").addEventListener("click", generateReport);
 });
