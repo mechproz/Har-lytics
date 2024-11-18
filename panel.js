@@ -1,7 +1,8 @@
 console.log("DevTools panel loaded");
 
 // Array to store network requests
-const networkRequests = [];
+const networkRequests = []; // For saving HAR files
+const flowData = [];        // For flow diagrams and other custom data
 
 // Variable to store the inspected page's hostname
 let inspectedHostname = null;
@@ -87,6 +88,80 @@ function displayMaliciousIps() {
     });
 }
 
+// Initialize variables for automatic saving
+let autoSaveIntervalId = null;
+
+// Function to save HAR file
+function saveHAR(isAutoSave = false) {
+    // Check if there are any requests to save
+    if (networkRequests.length === 0) {
+        console.warn("No network requests to save.");
+        return;
+    }
+
+    const harData = {
+        log: {
+            version: "1.2",
+            creator: { name: "HAR Data Viewer", version: "1.0" },
+            entries: networkRequests.map(request => ({
+                startedDateTime: new Date(request.startedDateTime).toISOString(),
+                time: request.time,
+                request: {
+                    method: request.request.method,
+                    url: request.request.url,
+                    headers: request.request.headers
+                },
+                response: {
+                    status: request.response.status,
+                    statusText: request.response.statusText,
+                    headers: request.response.headers,
+                    content: {
+                        mimeType: request.response.content.mimeType,
+                        size: request.response.content.size
+                    }
+                }
+            }))
+        }
+    };
+
+    // Adjust time to Singapore timezone (GMT+8)
+    const now = new Date();
+    now.setHours(now.getHours() + 8);
+
+    // Format filename
+    const saveType = isAutoSave ? "auto" : "manual";
+    const timestamp = now.toISOString().replace("T", "_").replace(/[:.]/g, "-").slice(0, 19);
+    const filename = `traffic_${saveType}_${timestamp}.har`;
+
+    // Create and download the HAR file
+    const blob = new Blob([JSON.stringify(harData, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    // Clear network data after saving
+    networkRequests.length = 0;
+}
+
+// Function to start automatic saving
+function startAutoSave(interval) {
+    stopAutoSave(); // Clear existing interval
+    autoSaveIntervalId = setInterval(() => saveHAR(true), interval * 1000);
+    console.log(`Auto-save started with interval ${interval} seconds.`);
+}
+
+// Function to stop automatic saving
+function stopAutoSave() {
+    if (autoSaveIntervalId) {
+        clearInterval(autoSaveIntervalId);
+        autoSaveIntervalId = null;
+        console.log("Auto-save stopped.");
+    }
+}
+
 // Wait until the DOM is fully loaded
 document.addEventListener("DOMContentLoaded", () => {
     // Function to toggle views
@@ -120,20 +195,53 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById('analysis-overview-tab').addEventListener('click', () => showView('analysis-overview'));
     document.getElementById('report-config-tab').addEventListener('click', () => showView('report-config'));
 
-    // Placeholder content for each tab
+    // Event listener for manual save button
+    const saveHarButton = document.getElementById("save-har");
+    if (saveHarButton) {
+        saveHarButton.addEventListener("click", () => {
+            console.log("Save Traffic button clicked");
+            saveHAR(false);
+        });
+    }
 
-    // Overview Tab - Display high-level statistics
-    document.getElementById("network-entries-overview").innerHTML = `
-        <p>Placeholder: Overview of network activity with basic stats.</p>
-        <p>Example: Total requests, breakdown by HTTP method, and status codes.</p>
-    `;
+    // Event listener for auto-save toggle
+    const toggleAutoSave = document.getElementById("toggle-auto-save");
+    const intervalInput = document.getElementById("auto-save-interval");
+    if (toggleAutoSave && intervalInput) {
+        toggleAutoSave.addEventListener("change", () => {
+            const interval = parseInt(intervalInput.value, 10) || 30;
+            if (toggleAutoSave.checked) {
+                startAutoSave(interval);
+            } else {
+                stopAutoSave();
+            }
+        });
+
+        // Event listener for interval input change
+        intervalInput.addEventListener("change", () => {
+            const interval = parseInt(intervalInput.value, 10) || 30;
+            if (toggleAutoSave.checked) {
+                startAutoSave(interval);
+                console.log(`Auto-save interval updated to ${interval} seconds.`);
+            }
+        });
+
+        // Start auto-save if enabled on load
+        if (toggleAutoSave.checked) {
+            const interval = parseInt(intervalInput.value, 10) || 30;
+            startAutoSave(interval);
+        }
+    }
 
     // Capture network requests
     chrome.devtools.network.onRequestFinished.addListener((request) => {
-        // Store the request in the networkRequests array
-        networkRequests.push({
+        // Store the full request object for HAR saving
+        networkRequests.push(request);
+
+        // Store the custom data for flow diagrams or other purposes
+        flowData.push({
             source: inspectedHostname || "unknown",
-            target: new URL(request.request.url).hostname, // Destination host
+            target: new URL(request.request.url).hostname,
             count: 1, // Initialize a count property to track requests
             destIP: request.serverIPAddress || "N/A" // Capture destination IP if available
         });
@@ -271,7 +379,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const linksMap = {};
 
         // Process unique nodes and links
-        networkRequests.forEach(req => {
+        flowData.forEach(req => {
             const sourceHost = req.source;
             const targetHost = req.target;
 
@@ -417,12 +525,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Refresh button to re-render the diagram with new data
     document.getElementById("refresh-diagram").addEventListener("click", renderDiagram);
-
-    // Analysis Overview Tab - Placeholder for aggregated analysis results
-    document.getElementById("network-entries-analysis").innerHTML = `
-        <p>Placeholder: Summary of key findings from all analyses (e.g., XSS, Threat Correlation).</p>
-        <p>Implement: Aggregate important metrics from each tab.</p>
-    `;
 
     // Report Config Tab - Placeholder for report generation options
     document.getElementById("report-config").innerHTML += `

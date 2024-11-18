@@ -71,7 +71,16 @@
 
   <!-- Overview View -->
   <div id="overview" class="view-section">
-    <h2>Overview</h2>
+    <h2>Save Traffic</h2>
+    <!-- Interval Input for Automatic Save -->
+    <div>
+      <label for="auto-save-interval">Set interval (seconds):</label>
+      <input type="number" id="auto-save-interval" min="1" value="30" />
+      <input type="checkbox" id="toggle-auto-save" checked /> Enable Automatic Save
+    </div>
+
+    <!-- Button to manually save the captured traffic as a HAR file -->
+    <button id="save-har">Save Traffic</button>
     <div id="network-entries-overview"></div>
   </div>
 
