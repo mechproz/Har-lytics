@@ -101,15 +101,29 @@
       background-color: #f5f5f5;
       font-weight: bold;
     }
+    #search-container {
+    margin-bottom: 10px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    }
+
+    #search-bar {
+        padding: 5px;
+        flex: 1;
+    }
+
+    #filter-type {
+        padding: 5px;
+    }
   </style>
-  
 </head>
 <body>
   <h1>Network Request Viewer</h1>
 
   <!-- Buttons to toggle between views -->
   <div id="tabs">
-    <button id="overview-tab" class="tab-button">Overview</button>
+    <button id="overview-tab" class="tab-button">Save Traffic Data</button>
     <button id="network-requests-tab" class="tab-button active">Network Requests</button>
     <button id="xss-detection-tab" class="tab-button">XSS Detection</button>
     <button id="threat-correlation-tab" class="tab-button">Threat Correlation</button>
@@ -135,6 +149,17 @@
   <!-- Network Requests View -->
   <div id="network-requests" class="view-section active">
     <h2>Network Requests</h2>
+    <div id="search-container">
+        <input type="text" id="search-bar" placeholder="Search requests...">
+        <select id="filter-type">
+            <option value="all">All</option>
+            <option value="url">URL</option>
+            <option value="method">Method</option>
+            <option value="status">Status</option>
+            <option value="timestamp">Timestamp</option>
+        </select>
+    </div>
+    <div id="filtered-results"></div>
     <div id="network-entries"></div> <!-- Div to hold network requests -->
   </div>
 
@@ -175,6 +200,7 @@
   <!-- Report Config View -->
   <div id="report-config" class="view-section">
       <h2>Report Configuration</h2>
+      <p>Select which sections to include in the report.</p>
       <label><input type="checkbox" id="include-network-requests" checked> Include Overview</label><br>
       <label><input type="checkbox" id="include-xss" checked> Include XSS Detection</label><br>
       <label><input type="checkbox" id="include-threats" checked> Include Threat Correlation</label><br>

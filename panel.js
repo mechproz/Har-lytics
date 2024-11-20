@@ -158,6 +158,8 @@ function displayMaliciousIps() {
     }
 }
 
+
+
 // Add listener for network requests
 chrome.devtools.network.onRequestFinished.addListener((request) => {
     const remoteIPAddress = request.serverIPAddress || "N/A"; // Get the remote IP address
@@ -261,12 +263,235 @@ function stopAutoSave() {
     }
 }
 
+// Filter functions
+
+function isUnwantedType(request) {
+    const unwantedExtensions = /\.(svg|ico|png|jpg|jpeg|woff|woff2|ttf|css|js)$/i;
+    const contentTypeHeader = request.response.headers.find(
+        header => header.name.toLowerCase() === "content-type"
+    );
+    const contentType = contentTypeHeader ? contentTypeHeader.value : null;
+
+    return unwantedExtensions.test(request.request.url) ||
+           (contentType && /image|font|text\/css|javascript/.test(contentType));
+}
+
+// Function to fetch and parse multiple blocklists
+async function fetchBlocklists(urls) {
+    const blocklist = new Set();
+    for (const url of urls) {
+        try {
+            const response = await fetch(url);
+            const text = await response.text();
+            // Process each line of the blocklist, ignoring comments
+            text.split("\n").forEach(domain => {
+                const trimmedDomain = domain.trim();
+                if (trimmedDomain && !trimmedDomain.startsWith("#")) {
+                    blocklist.add(trimmedDomain); // Add the domain to the set
+                }
+            });
+            console.log(`Loaded ${url}: ${blocklist.size} entries`);
+        } catch (error) {
+            console.error("Error fetching blocklist from:", url, error);
+        }
+    }
+    return blocklist;
+}
+
+// URLs for blocklist sources
+const blocklistSources = [
+    "https://pgl.yoyo.org/adservers/serverlist.php?hostformat=plain&showintro=0",
+    "https://easylist.to/easylist/easylist.txt",
+    "https://adguardteam.github.io/HostlistsRegistry/assets/filter_2.txt"
+];
+
+// Set to store merged blocklist
+let blockedDomainsSet = new Set();
+
+// Initialize blocklist on load
+fetchBlocklists(blocklistSources).then(blocklist => {
+    blockedDomainsSet = blocklist;
+    console.log("Merged Blocklist Loaded:", blockedDomainsSet.size, "entries");
+});
+
+// Function to check if a request is in the blocklist
+function isBlockedDomain(request) {
+    try {
+        const hostname = new URL(request.request.url).hostname;
+        return blockedDomainsSet.has(hostname);
+    } catch (error) {
+        console.error("Error parsing URL:", request.request.url, error);
+        return false;
+    }
+}
+
+function matchesUnwantedPattern(request) {
+    const unwantedPatterns = [
+        "/fonts/",
+        "/logo/",
+        "/icon/",
+        "/assets/",
+        "/async/",
+        "/gen_204",
+        "/client_204"
+    ];
+
+    return unwantedPatterns.some(pattern => request.request.url.includes(pattern));
+}
+
+// Combine all filters into one function
+function isUnwantedRequest(request) {
+    return (
+        (isBlockedDomain(request) ||
+        isUnwantedType(request) ||
+        matchesUnwantedPattern(request))
+    );
+}
+
 // ====================================================
 // DOM Event Listeners and Interaction Setup
 // ====================================================
 
 // Wait until the DOM is fully loaded
 document.addEventListener("DOMContentLoaded", () => {
+
+    // ====================================================
+    // Search Bar
+    // ====================================================
+
+    // Get references to search bar, filter type dropdown, and results container
+    const searchBar = document.getElementById("search-bar");
+    const filterType = document.getElementById("filter-type");
+    const filteredResultsContainer = document.getElementById("filtered-results");
+
+    // Function to filter requests based on search criteria
+    function filterRequests() {
+        const searchQuery = searchBar.value.trim().toLowerCase(); // Trim and normalize query
+        const filter = filterType.value;
+
+        // If the search query is empty, clear the filtered results and return
+        if (searchQuery === "") {
+            clearFilteredResults(); // Remove any search-related data
+            return;
+        }
+
+        // Filter networkRequests based on the query and selected filter type
+        const filteredRequests = networkRequests.filter(request => {
+            const url = request.request.url.toLowerCase();
+            const method = request.request.method.toLowerCase();
+            const status = String(request.response.status).toLowerCase();
+            const timestamp = new Date(request.startedDateTime).toISOString().toLowerCase();
+
+            switch (filter) {
+                case "url":
+                    return url.includes(searchQuery);
+                case "method":
+                    return method.includes(searchQuery);
+                case "status":
+                    return status.includes(searchQuery);
+                case "timestamp":
+                    return timestamp.includes(searchQuery);
+                default: // "all"
+                    return (
+                        url.includes(searchQuery) ||
+                        method.includes(searchQuery) ||
+                        status.includes(searchQuery) ||
+                        timestamp.includes(searchQuery)
+                    );
+            }
+        });
+
+        renderFilteredResults(filteredRequests); // Render filtered results
+    }
+
+    // Function to render filtered results with expand/collapse feature
+    function renderFilteredResults(filteredRequests) {
+        filteredResultsContainer.innerHTML = ""; // Clear previous results
+
+        // Display a message if no results match the search criteria
+        if (filteredRequests.length === 0) {
+            filteredResultsContainer.innerHTML = "<p>No matching results found.</p>";
+            return;
+        }
+
+        // Create and append entries for each filtered request
+        filteredRequests.forEach(request => {
+            const timestamp = new Date(request.startedDateTime).toISOString();
+
+            // Create container for the request entry
+            const entryDiv = document.createElement("div");
+            entryDiv.classList.add("network-entry");
+
+            // Create header with summary
+            const headerDiv = document.createElement("div");
+            headerDiv.classList.add("network-header");
+            headerDiv.innerHTML = `
+                <strong>Timestamp:</strong> ${timestamp}<br>
+                <strong>URL:</strong> ${request.request.url}<br>
+                <strong>Method:</strong> ${request.request.method}<br>
+                <strong>Status:</strong> ${request.response.status}<br>
+                <strong>Time:</strong> ${request.time.toFixed(2)} ms
+            `;
+
+            // Create detailed content (initially hidden)
+            const contentDiv = document.createElement("div");
+            contentDiv.classList.add("network-content");
+            contentDiv.style.display = "none";
+            contentDiv.innerHTML = `
+                <strong>Request Headers:</strong><br>
+                ${request.request.headers.map(header => `${header.name}: ${header.value}`).join("<br>")}<br>
+                <strong>Response Headers:</strong><br>
+                ${request.response.headers.map(header => `${header.name}: ${header.value}`).join("<br>")}<br>
+                <strong>Request Body:</strong><br>${request.request.postData?.text || "No body"}<br>
+                <strong>Response Body:</strong><br>${request.response.content?.text || "No content"}<br>
+            `;
+
+            // Add click event for expanding/collapsing details
+            headerDiv.addEventListener("click", () => {
+                contentDiv.style.display = contentDiv.style.display === "none" ? "block" : "none";
+            });
+
+            // Append header and content to the entry
+            entryDiv.appendChild(headerDiv);
+            entryDiv.appendChild(contentDiv);
+
+            // Append entry to the filtered results container
+            filteredResultsContainer.appendChild(entryDiv);
+        });
+
+        // Add a separator to indicate the end of filtered results
+        addSeparator();
+    }
+
+    // Function to clear filtered results
+    function clearFilteredResults() {
+        filteredResultsContainer.innerHTML = ""; // Clear all search-related content
+    }
+
+    // Function to add a separator for end of filtered results
+    function addSeparator() {
+        const separatorDiv = document.createElement("div");
+        separatorDiv.classList.add("separator");
+        separatorDiv.style.borderTop = "2px dashed #ccc";
+        separatorDiv.style.borderBottom = "2px dashed #ccc";
+        separatorDiv.style.margin = "20px 0";
+        separatorDiv.style.textAlign = "center";
+        separatorDiv.innerHTML = "<h1>End of filtered results</h1>";
+
+        filteredResultsContainer.appendChild(separatorDiv);
+    }
+
+    // Add event listeners to the search bar and filter dropdown
+    searchBar.addEventListener("input", filterRequests);
+    filterType.addEventListener("change", filterRequests);
+
+    // Trigger filtering initially only if search query exists
+    if (searchBar.value.trim() !== "") {
+        filterRequests();
+    } else {
+        clearFilteredResults(); // Ensure no unnecessary data is shown on initial load
+    }
+
     // Function to toggle views
     function showView(viewId) {
         // Hide all views
@@ -345,6 +570,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Capture network requests
     chrome.devtools.network.onRequestFinished.addListener((request) => {
+        // Check if the request should be filtered out
+        if (isUnwantedRequest(request)) {
+            return; // Skip this request
+        }
+
         // Store the full request object for HAR saving
         networkRequests.push(request);
 
@@ -361,56 +591,61 @@ document.addEventListener("DOMContentLoaded", () => {
         // ====================================================
 
         // Network Requests Tab - Display individual network requests
-        if (document.getElementById("network-requests").classList.contains("active")) {
-            console.log("Request captured:", request);
-            const entryDiv = document.createElement("div");
-            entryDiv.classList.add("network-entry");
+        console.log("Request captured:", request);
+        const entryDiv = document.createElement("div");
+        entryDiv.classList.add("network-entry");
 
-            // Placeholder for request data display
-            const requestHeaders = request.request.headers.map(header => `${header.name}: ${header.value}`).join("<br>");
-            const responseHeaders = request.response.headers.map(header => `${header.name}: ${header.value}`).join("<br>");
-            const postData = request.request.postData ? request.request.postData.text : "No body";
-            const responseBody = request.response.content ? request.response.content.text : "No content";
+        // Placeholder for request data display
+        const requestHeaders = request.request.headers.map(header => `${header.name}: ${header.value}`).join("<br>");
+        const responseHeaders = request.response.headers.map(header => `${header.name}: ${header.value}`).join("<br>");
+        const postData = request.request.postData ? request.request.postData.text : "No body";
+        const responseBody = request.response.content ? request.response.content.text : "No content";
 
-            // Timing data
-            const timings = request.timings;
-            const dnsTime = timings ? timings.dns : "N/A";
-            const connectTime = timings ? timings.connect : "N/A";
-            const sendTime = timings ? timings.send : "N/A";
-            const receiveTime = timings ? timings.receive : "N/A";
+        // Timing data
+        const timings = request.timings;
+        const dnsTime = timings ? timings.dns : "N/A";
+        const connectTime = timings ? timings.connect : "N/A";
+        const sendTime = timings ? timings.send : "N/A";
+        const receiveTime = timings ? timings.receive : "N/A";
 
-            // Header with summary and collapsible content
-            const headerDiv = document.createElement("div");
-            headerDiv.classList.add("network-header");
-            headerDiv.innerHTML = `
-                <strong>URL:</strong> ${request.request.url}<br>
-                <strong>Method:</strong> ${request.request.method}<br>
-                <strong>Status:</strong> ${request.response.status}<br>
-                <strong>Time:</strong> ${request.time.toFixed(2)} ms
-            `;
+        // Header with summary and collapsible content
+        const headerDiv = document.createElement("div");
+        headerDiv.classList.add("network-header");
+        const timestamp = new Date(request.startedDateTime).toISOString();
+        headerDiv.innerHTML = `
+            <strong>Timestamp:</strong> ${timestamp}<br>
+            <strong>URL:</strong> ${request.request.url}<br>
+            <strong>Method:</strong> ${request.request.method}<br>
+            <strong>Status:</strong> ${request.response.status}<br>
+            <strong>Time:</strong> ${request.time.toFixed(2)} ms
+        `;
 
-            // Collapsible content with detailed data
-            const contentDiv = document.createElement("div");
-            contentDiv.classList.add("network-content");
-            contentDiv.style.display = "none";
-            contentDiv.innerHTML = `
-                <strong>DNS Time:</strong> ${dnsTime} ms<br>
-                <strong>Connect Time:</strong> ${connectTime} ms<br>
-                <strong>Send Time:</strong> ${sendTime} ms<br>
-                <strong>Receive Time:</strong> ${receiveTime} ms<br>
-                <strong>Request Headers:</strong><br>${requestHeaders}<br>
-                <strong>Response Headers:</strong><br>${responseHeaders}<br>
-                <strong>Request Body:</strong><br>${postData}<br>
-                <strong>Response Body:</strong><br>${responseBody}<br>
-            `;
+        // Collapsible content with detailed data
+        const contentDiv = document.createElement("div");
+        contentDiv.classList.add("network-content");
+        contentDiv.style.display = "none";
+        contentDiv.innerHTML = `
+            <strong>DNS Time:</strong> ${dnsTime} ms<br>
+            <strong>Connect Time:</strong> ${connectTime} ms<br>
+            <strong>Send Time:</strong> ${sendTime} ms<br>
+            <strong>Receive Time:</strong> ${receiveTime} ms<br>
+            <strong>Request Headers:</strong><br>${requestHeaders}<br>
+            <strong>Response Headers:</strong><br>${responseHeaders}<br>
+            <strong>Request Body:</strong><br>${postData}<br>
+            <strong>Response Body:</strong><br>${responseBody}<br>
+        `;
 
-            headerDiv.addEventListener("click", () => {
-                contentDiv.style.display = contentDiv.style.display === "block" ? "none" : "block";
-            });
+        headerDiv.addEventListener("click", () => {
+            contentDiv.style.display = contentDiv.style.display === "block" ? "none" : "block";
+        });
 
-            entryDiv.appendChild(headerDiv);
-            entryDiv.appendChild(contentDiv);
-            document.getElementById("network-entries").appendChild(entryDiv);
+        entryDiv.appendChild(headerDiv);
+        entryDiv.appendChild(contentDiv);
+
+        // Append to the Network Requests container
+        const networkEntriesContainer = document.getElementById("network-entries");
+        if (networkEntriesContainer) {
+            networkEntriesContainer.appendChild(entryDiv);
         }
 
         // ====================================================
@@ -418,60 +653,62 @@ document.addEventListener("DOMContentLoaded", () => {
         // ====================================================
 
         // XSS Detection Tab
-        if (document.getElementById("xss-detection").classList.contains("active")) {
-            request.getContent((content) => {
-                const xssIssues = detectXSS(content || "") || detectXSS(request.request.postData?.text || "");
+        request.getContent((content) => {
+            const xssIssues = detectXSS(content || "") || detectXSS(request.request.postData?.text || "");
 
-                if (xssIssues.length > 0) {
-                    // Push the issue into the global array
-                    xssIssuesGlobal.push({
-                        url: request.request.url,
-                        patterns: xssIssues
-                    });
-                    console.log("XSS Issue Detected:", xssIssuesGlobal);
+            if (xssIssues.length > 0) {
+                // Push the issue into the global array
+                xssIssuesGlobal.push({
+                    url: request.request.url,
+                    patterns: xssIssues
+                });
+                console.log("XSS Issue Detected:", xssIssuesGlobal);
 
-                    const entryRow = document.createElement("tr");
+                const entryRow = document.createElement("tr");
 
-                    // URL Column
-                    const urlCol = document.createElement("td");
-                    urlCol.textContent = request.request.url;
-                    entryRow.appendChild(urlCol);
+                // URL Column
+                const urlCol = document.createElement("td");
+                urlCol.textContent = request.request.url;
+                entryRow.appendChild(urlCol);
 
-                    // Detected Patterns Column
-                    const xssCol = document.createElement("td");
-                    xssCol.innerHTML = `Patterns: ${xssIssues.join(", ")}`;
-                    xssCol.classList.add("xss-issue");
-                    entryRow.appendChild(xssCol);
+                // Detected Patterns Column
+                const xssCol = document.createElement("td");
+                xssCol.innerHTML = `Patterns: ${xssIssues.join(", ")}`;
+                xssCol.classList.add("xss-issue");
+                entryRow.appendChild(xssCol);
 
-                    // Details Column with Toggle
-                    const detailsCol = document.createElement("td");
-                    const detailsContent = document.createElement("div");
-                    detailsContent.classList.add("details-content");
-                    detailsContent.style.display = "none";
+                // Details Column with Toggle
+                const detailsCol = document.createElement("td");
+                const detailsContent = document.createElement("div");
+                detailsContent.classList.add("details-content");
+                detailsContent.style.display = "none";
 
-                    detailsContent.innerHTML = `
-                        <strong>Request URL:</strong> ${request.request.url}<br>
-                        <strong>Request Method:</strong> ${request.request.method}<br>
-                        <strong>Request Headers:</strong> ${request.request.headers.map(header => `${header.name}: ${header.value}`).join("<br>")}<br>
-                        <strong>Response Headers:</strong> ${request.response.headers.map(header => `${header.name}: ${header.value}`).join("<br>")}<br>
-                        <strong>Request Body:</strong><br>${request.request.postData?.text || "No body"}<br>
-                        <strong>Response Body:</strong><br>${content || "No content"}
-                    `;
+                detailsContent.innerHTML = `
+                    <strong>Request URL:</strong> ${request.request.url}<br>
+                    <strong>Request Method:</strong> ${request.request.method}<br>
+                    <strong>Request Headers:</strong> ${request.request.headers.map(header => `${header.name}: ${header.value}`).join("<br>")}<br>
+                    <strong>Response Headers:</strong> ${request.response.headers.map(header => `${header.name}: ${header.value}`).join("<br>")}<br>
+                    <strong>Request Body:</strong><br>${request.request.postData?.text || "No body"}<br>
+                    <strong>Response Body:</strong><br>${content || "No content"}
+                `;
 
-                    const expandButton = document.createElement("button");
-                    expandButton.textContent = "Expand";
-                    expandButton.addEventListener("click", () => {
-                        detailsContent.style.display = detailsContent.style.display === "none" ? "block" : "none";
-                    });
+                const expandButton = document.createElement("button");
+                expandButton.textContent = "Expand";
+                expandButton.addEventListener("click", () => {
+                    detailsContent.style.display = detailsContent.style.display === "none" ? "block" : "none";
+                });
 
-                    detailsCol.appendChild(expandButton);
-                    detailsCol.appendChild(detailsContent);
-                    entryRow.appendChild(detailsCol);
+                detailsCol.appendChild(expandButton);
+                detailsCol.appendChild(detailsContent);
+                entryRow.appendChild(detailsCol);
 
-                    document.getElementById("xss-entries").appendChild(entryRow);
+                // Append entry to the XSS Detection container
+                const xssEntriesContainer = document.getElementById("xss-entries");
+                if (xssEntriesContainer) {
+                    xssEntriesContainer.appendChild(entryRow);
                 }
-            });
-        }
+            }
+        });
 
         // ====================================================
         // Threat Detection
@@ -664,10 +901,6 @@ document.addEventListener("DOMContentLoaded", () => {
     // ====================================================
 
     // Report Generation Tab
-    document.getElementById("report-config").innerHTML += `
-        <p>Select which sections to include in the report.</p>
-    `;
-
     function generateReport() {
         try {
             // Collect user preferences for report sections
