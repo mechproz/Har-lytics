@@ -53,7 +53,56 @@
       list-style-type: none;
       padding-left: 0;
     }
+  
+    /* New CSS for Malicious IP Details Table */
+    .ip-container {
+      border: 1px solid #ccc;
+      margin-bottom: 10px;
+      border-radius: 5px;
+      overflow: hidden;
+      padding: 5px;
+    }
+    .ip-header {
+      background-color: #f8d7da;
+      padding: 10px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .ip-header:hover {
+      background-color: #f5c6cb;
+    }
+    .ip-icon {
+      margin-right: 10px;
+      color: #d9534f;
+    }
+    .toggle-icon {
+      font-size: 12px;
+      color: #555;
+    }
+    .ip-details {
+      padding: 10px;
+      display: none; /* Hidden by default */
+    }
+    .ip-details-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      font-size: 14px;
+    }
+    .ip-details-table th,
+    .ip-details-table td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: left;
+    }
+    .ip-details-table th {
+      background-color: #f5f5f5;
+      font-weight: bold;
+    }
   </style>
+  
 </head>
 <body>
   <h1>Network Request Viewer</h1>
@@ -107,10 +156,13 @@
   <!-- Threat Correlation View -->
   <div id="threat-correlation" class="view-section">
     <h2>Threat Correlation</h2>
-    <!-- This div will display the malicious IP warning only when a match is found -->
-    <div id="malicious-alert">Connected to known malicious site(s):</div>
-    <ul id="malicious-list"></ul>
+    <!-- Display Malicious IP Warning -->
+    <div id="malicious-alert" class="alert">
+      <strong>Warning!</strong> Connected to known malicious site(s):
+    </div>
+    <div id="malicious-list"></div>
   </div>
+
 
   <!-- Flow Diagrams View -->
   <div id="flow-diagrams" class="view-section">

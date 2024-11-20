@@ -74,7 +74,7 @@ async function fetchMaliciousIPs() {
 
 // Initialize malicious IP list and a Map to track detected IPs and their associated requests
 let maliciousIPs = [];
-const detectedIPs = new Map();  // Map to group requests by IP
+const detectedIPs = new Map(); // Map to group requests by IP
 
 // Fetch malicious IPs on script load
 fetchMaliciousIPs().then(ips => {
@@ -85,26 +85,103 @@ fetchMaliciousIPs().then(ips => {
 // Function to display the malicious IPs, methods, and URLs in the HTML
 function displayMaliciousIps() {
     const maliciousList = document.getElementById('malicious-list');
-    if (!maliciousList) return;
+    const maliciousAlertDiv = document.getElementById('malicious-alert');
+    if (!maliciousList || !maliciousAlertDiv) return;
 
-    maliciousList.innerHTML = ""; // Clear previous entries
+    // Show or hide the alert based on detected IPs
+    if (detectedIPs.size > 0) {
+        maliciousAlertDiv.style.display = 'block';
+        maliciousList.innerHTML = ""; // Clear previous entries
 
-    detectedIPs.forEach((requests, ip) => {
-        const ipHeader = document.createElement('li');
-        ipHeader.innerHTML = `<strong>IP:</strong> ${ip}`;
-        ipHeader.style.marginTop = '10px';
-        maliciousList.appendChild(ipHeader);
+        detectedIPs.forEach((requests, ip) => {
+            // Create a collapsible section for each malicious IP
+            const ipContainer = document.createElement('div');
+            ipContainer.className = 'ip-container';
 
-        requests.forEach(({ method, url }) => {
-            const requestItem = document.createElement('li');
-            requestItem.innerHTML = `&nbsp;&nbsp;<strong>Method:</strong> ${method}<br>&nbsp;&nbsp;<strong>URL:</strong> ${url}<br><br>`;
-            maliciousList.appendChild(requestItem);
-        });
+            const ipHeader = document.createElement('div');
+            ipHeader.className = 'ip-header';
+            ipHeader.innerHTML = `
+                <span class="ip-icon">⚠️</span>
+                <strong>Malicious IP:</strong> ${ip}
+                <span class="toggle-icon">▼</span>
+            `;
 
-        const gap = document.createElement('br');
-        maliciousList.appendChild(gap);
-    });
+            const ipDetails = document.createElement('div');
+            ipDetails.className = 'ip-details';
+            ipDetails.style.display = 'none'; // Initially collapsed
+
+            // requests.forEach(({ method, url }) => {
+            //     const requestItem = document.createElement('div');
+            //     requestItem.className = 'request-item';
+            //     requestItem.innerHTML = `
+            //         <p><strong>Method:</strong> ${method}</p>
+            //         <p><strong>URL:</strong> ${url}</p>
+            //     `;
+            //     ipDetails.appendChild(requestItem);
+            // });
+
+             // Create a table for the details
+             const table = document.createElement('table');
+             table.className = 'ip-details-table';
+             table.innerHTML = `
+                 <thead>
+                     <tr>
+                         <th>HTTP Method</th>
+                         <th>Request URL</th>
+                     </tr>
+                 </thead>
+                 <tbody>
+                 ${requests.map(({ method, url }) => `
+                     <tr>
+                         <td>${method}</td>
+                         <td>${url}</td>
+                     </tr>
+                 `).join('')}
+                 </tbody>
+             `;
+ 
+             ipDetails.appendChild(table);
+ 
+             // Toggle visibility of the details
+             ipHeader.addEventListener('click', () => {
+                 const isHidden = ipDetails.style.display === 'none';
+                 ipDetails.style.display = isHidden ? 'block' : 'none';
+                 ipHeader.querySelector('.toggle-icon').textContent = isHidden ? '▲' : '▼';
+             });
+ 
+             ipContainer.appendChild(ipHeader);
+             ipContainer.appendChild(ipDetails);
+             maliciousList.appendChild(ipContainer);
+         });
+    } else {
+        maliciousAlertDiv.style.display = 'none';
+    }
 }
+
+// Add listener for network requests
+chrome.devtools.network.onRequestFinished.addListener((request) => {
+    const remoteIPAddress = request.serverIPAddress || "N/A"; // Get the remote IP address
+    const method = request.request.method; // Get the HTTP method
+    const url = request.request.url; // Get the URL
+
+    console.log("Request captured:", { url, remoteIPAddress, method });
+
+    // Check if the IP is in the malicious list
+    if (maliciousIPs.includes(remoteIPAddress)) {
+        console.warn("Malicious IP detected:", remoteIPAddress);
+
+        // Add the request details to the Map under the specific IP
+        if (!detectedIPs.has(remoteIPAddress)) {
+            detectedIPs.set(remoteIPAddress, []); // Initialize array for new IP
+        }
+        detectedIPs.get(remoteIPAddress).push({ method, url });
+
+        // Update the display with the grouped malicious IPs and their requests
+        displayMaliciousIps();
+    }
+});
+
+
 
 // ====================================================
 // HAR File Saving Functions
