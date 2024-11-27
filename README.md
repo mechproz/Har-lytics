@@ -8,7 +8,7 @@ The **HAR Data Viewer** is a Chrome Developer Tools extension designed for compr
 ## Features
 
 ### 1. Save Traffic Data
-![Save Traffic Screenshot](images/savetraffic.png "Network Requests")
+![Save Traffic Screenshot](images/savetraffic.PNG "Network Requests")
 - **Manual Save**: Save captured network requests as a HAR file manually.
 - **Automatic Save**: Automatically save HAR data at regular intervals.
   - Customizable save intervals.
@@ -17,7 +17,7 @@ The **HAR Data Viewer** is a Chrome Developer Tools extension designed for compr
 ---
 
 ### 2. Network Requests Viewer
-![Network Requests Screenshot](images/networkrequest.png "Network Requests")
+![Network Requests Screenshot](images/networkrequest.PNG "Network Requests")
 - **Search & Filter**: Search and filter network requests by:
   - URL
   - HTTP method
@@ -30,7 +30,7 @@ The **HAR Data Viewer** is a Chrome Developer Tools extension designed for compr
 ---
 
 ### 3. XSS Detection
-![XSS Detection Screenshot](images/xss.png "Network Requests")
+![XSS Detection Screenshot](images/xss.PNG "Network Requests")
 - **Real-Time Detection**: Monitors for Cross-Site Scripting (XSS) patterns in requests and responses.
 - **Pattern Matching**: Detects XSS patterns such as:
   - Inline JavaScript (`<script>`)
@@ -42,7 +42,7 @@ The **HAR Data Viewer** is a Chrome Developer Tools extension designed for compr
 ---
 
 ### 4. Threat Correlation
-![Threat Correlation Screenshot](images/threatcorrelation.png "Network Requests")
+![Threat Correlation Screenshot](images/threatcorrelation.PNG "Network Requests")
 - **Malicious IP Detection**:
   - Compares captured traffic against a list of known malicious IPs.
   - Displays alerts and request details for flagged connections.
@@ -52,12 +52,12 @@ The **HAR Data Viewer** is a Chrome Developer Tools extension designed for compr
 ---
 
 ### 5. Flow Diagrams
-![Top Connections Screenshot](images/networkrequestflow.png "Network Requests")
+![Top Connections Screenshot](images/networkrequestflow.PNG "Network Requests")
 - **Top Connections**:
   - Visualizes the most frequent source-to-destination connections.
   - Bar chart showing top connections based on request counts.
 
-![Traffic Over Time Screenshot](images/networktrafficflow.png "Network Requests")
+![Traffic Over Time Screenshot](images/networktrafficflow.PNG "Network Requests")
 - **Traffic Over Time**:
   - Line graph showing network traffic volume over time.
   - Manual and auto-refresh options available.
@@ -65,7 +65,7 @@ The **HAR Data Viewer** is a Chrome Developer Tools extension designed for compr
 ---
 
 ### 6. Timing Analysis
-![Timing Anomaly Screenshot](images/timing.png "Network Requests")
+![Timing Anomaly Screenshot](images/timing.PNG "Network Requests")
 - **Timing Anomalies**:
   - Identifies slow DNS resolution, connection, or request processing times.
   - Detects potential MITM attacks based on configurable timing thresholds.
@@ -74,7 +74,7 @@ The **HAR Data Viewer** is a Chrome Developer Tools extension designed for compr
 ---
 
 ### 7. Report Generation
-![Report Generation Screenshot](images/generatereport.png "Network Requests")
+![Report Generation Screenshot](images/generatereport.PNG "Network Requests")
 - **Customizable Reports**:
   - Include selected sections:
     - Network Requests Summary
@@ -83,7 +83,7 @@ The **HAR Data Viewer** is a Chrome Developer Tools extension designed for compr
     - Flow Diagram Data
     - MITM Analysis
 - **HTML Export**: Download a detailed HTML report with visualizations.
-![Sample Html Screenshot](images/report.png "Network Requests")
+![Sample Html Screenshot](images/report.PNG "Network Requests")
 
 
 ---
