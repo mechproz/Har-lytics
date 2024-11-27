@@ -41,8 +41,22 @@ const XSS_PATTERNS = [
 
 // Function to detect XSS patterns in a given text
 function detectXSS(text) {
+
+    if (!text || typeof text !== "string") {
+        return []; // Return an empty array if the input is invalid
+    }
+
     let issues = [];
-    const decodedText = decodeURIComponent(text);
+    let decodedText = "";
+
+    try {
+        // Attempt to decode the text; fallback to original text if decoding fails
+        decodedText = decodeURIComponent(text);
+    } catch (error) {
+        console.warn("decodeURIComponent failed:", error);
+        decodedText = text; // Fallback to the raw text
+    }
+
     [text, decodedText].forEach(body => {
         XSS_PATTERNS.forEach(pattern => {
             if (pattern.test(body)) {
@@ -263,7 +277,9 @@ function stopAutoSave() {
     }
 }
 
-// Filter functions
+// ====================================================
+// Filtering Functions
+// ====================================================
 
 function isUnwantedType(request) {
     const unwantedExtensions = /\.(svg|ico|png|jpg|jpeg|woff|woff2|ttf|css|js)$/i;
@@ -349,6 +365,58 @@ function isUnwantedRequest(request) {
 }
 
 // ====================================================
+// Analysis Functions
+// ====================================================
+
+// Define timing thresholds for anomaly detection (in milliseconds)
+const TIMING_THRESHOLDS = {
+    dns: 200,         // DNS resolution time
+    connect: 500,     // Connection time
+    totalTime: 1000   // Total request time
+};
+
+// Function to detect timing anomalies in network requests
+function detectTimingAnomalies(request) {
+    const { timings } = request;
+    const totalTime = request.time; // Use the precomputed total time
+
+    console.log("Total Request Time:", totalTime);
+
+    // Check against thresholds
+    const isSlowTotal = totalTime > TIMING_THRESHOLDS.totalTime;
+
+    if (isSlowTotal) {
+        console.warn("Timing anomaly detected:", {
+            url: request.request.url,
+            totalTime
+        });
+
+        // Display timing anomaly alert
+        displayMitmAlert(
+            "Timing Anomaly",
+            `Request to ${request.request.url} took too long. Total Time: ${totalTime}ms`
+        );
+    } else {
+        console.log("Request time within acceptable limits:", {
+            url: request.request.url,
+            totalTime
+        });
+    }
+}
+
+// Function to display MITM alerts
+function displayMitmAlert(issueType, details) {
+    const mitmList = document.getElementById("mitm-list");
+    const alertDiv = document.createElement("div");
+    alertDiv.className = "mitm-alert";
+
+    alertDiv.innerHTML = `
+        <strong>${issueType}:</strong> ${details}
+    `;
+    mitmList.appendChild(alertDiv);
+}
+
+// ====================================================
 // DOM Event Listeners and Interaction Setup
 // ====================================================
 
@@ -410,7 +478,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // Display a message if no results match the search criteria
         if (filteredRequests.length === 0) {
-            filteredResultsContainer.innerHTML = "<p>No matching results found.</p>";
+            filteredResultsContainer.innerHTML = "<h1>No matching results found.</h1>";
             return;
         }
 
@@ -521,6 +589,7 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById('threat-correlation-tab').addEventListener('click', () => showView('threat-correlation'));
     document.getElementById('flow-diagrams-tab').addEventListener('click', () => showView('flow-diagrams'));
     document.getElementById('report-config-tab').addEventListener('click', () => showView('report-config'));
+    document.getElementById('analysis-tab').addEventListener('click', () => showView('analysis-section'));
 
     // ====================================================
     // HAR Saving Event Listeners
@@ -577,6 +646,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // Store the full request object for HAR saving
         networkRequests.push(request);
+
+        // Detect timing anomalies for MITM
+        detectTimingAnomalies(request);
 
         // Store the custom data for flow diagrams or other purposes
         flowData.push({
@@ -976,6 +1048,7 @@ document.getElementById("refresh-diagram").addEventListener("click", renderBarCh
             const includeXSS = document.getElementById('include-xss').checked;
             const includeThreats = document.getElementById('include-threats').checked;
             const includeFlow = document.getElementById('include-flow').checked;
+            const includeMitm = true; // Always include analysis
 
             // Initialize the report content
             let reportContent = `
@@ -1069,23 +1142,65 @@ document.getElementById("refresh-diagram").addEventListener("click", renderBarCh
             // Include Flow Diagrams
             if (includeFlow) {
                 reportContent += `<h2>Flow Diagram Data</h2>`;
-                const { nodes, links } = prepareData();
 
-                reportContent += `<h3>Nodes</h3><ul>`;
-                nodes.forEach(node => {
-                    reportContent += `<li>${node.id}</li>`;
-                });
-                reportContent += `</ul><h3>Links</h3><table>
-                <tr><th>Source</th><th>Target</th><th>Request Count</th><th>Destination IP</th></tr>`;
-                links.forEach(link => {
-                    reportContent += `<tr>
-                        <td>${link.source}</td>
-                        <td>${link.target}</td>
-                        <td>${link.count}</td>
-                        <td>${link.destIP}</td>
-                    </tr>`;
-                });
-                reportContent += `</table>`;
+                // Include Top Connections Summary
+                const topConnections = prepareTopConnections(5); // Get top 5 connections
+                reportContent += `<h3>Top Connections</h3>`;
+                if (topConnections.length > 0) {
+                    reportContent += `<table>
+                        <tr><th>Source</th><th>Target</th><th>Request Count</th></tr>`;
+                    topConnections.forEach(connection => {
+                        reportContent += `<tr>
+                            <td>${connection.source}</td>
+                            <td>${connection.target}</td>
+                            <td>${connection.count}</td>
+                        </tr>`;
+                    });
+                    reportContent += `</table>`;
+                } else {
+                    reportContent += `<p>No connections found.</p>`;
+                }
+
+                // Include Traffic Over Time Summary
+                const trafficData = prepareTimeData(); // Aggregate traffic data by minute
+                reportContent += `<h3>Traffic Over Time</h3>`;
+                if (trafficData.length > 0) {
+                    reportContent += `<table>
+                        <tr><th>Timestamp</th><th>Request Count</th></tr>`;
+                    trafficData.forEach(entry => {
+                        reportContent += `<tr>
+                            <td>${entry.timestamp.toLocaleString()}</td>
+                            <td>${entry.count}</td>
+                        </tr>`;
+                    });
+                    reportContent += `</table>`;
+                } else {
+                    reportContent += `<p>No traffic data available.</p>`;
+                }
+            }
+
+            // Include MITM Anomalies
+            if (includeMitm) {
+                const mitmList = document.querySelectorAll(".mitm-alert");
+                if (mitmList.length > 0) {
+                    reportContent += `<h2>MITM Anomalies</h2>`;
+                    reportContent += `<table>
+                        <tr>
+                            <th>Issue Type</th>
+                            <th>Details</th>
+                        </tr>`;
+                    mitmList.forEach(alert => {
+                        const issueType = alert.querySelector("strong").textContent;
+                        const details = alert.textContent.replace(issueType, "").trim();
+                        reportContent += `<tr>
+                            <td>${issueType}</td>
+                            <td>${details}</td>
+                        </tr>`;
+                    });
+                    reportContent += `</table>`;
+                } else {
+                    reportContent += `<p>No MITM anomalies detected.</p>`;
+                }
             }
 
             // Finalize and close the HTML content

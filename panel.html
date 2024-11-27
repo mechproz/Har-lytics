@@ -5,47 +5,162 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>HAR Data Viewer</title>
   <style>
-    .tab-button {
+    /* General layout styling */
+    body {
+      font-family: Arial, sans-serif;
+      color: #333;
+      margin: 0;
+      padding: 0;
+      background-color: #f9f9f9;
+      line-height: 1.6;
+    }
+
+    /* Tab container styling */
+    #tabs {
+      display: flex;
+      justify-content: center;
+      background-color: #ffffff;
       padding: 10px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+      border-bottom: 2px solid #ddd;
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+    }
+
+    /* Tab button styling */
+    .tab-button {
+      padding: 10px 15px;
+      font-size: 14px;
+      font-weight: bold;
+      color: #555;
       cursor: pointer;
-      border: 1px solid #ccc;
-      background-color: #f5f5f5;
-      margin-right: 5px;
+      border: none;
+      background-color: transparent;
+      transition: all 0.3s ease;
+      margin: 0 5px;
+      border-radius: 5px;
     }
+
+    .tab-button:hover {
+      background-color: #e0e0e0;
+      color: #333;
+    }
+
     .tab-button.active {
-      background-color: #ddd;
+      background-color: #007BFF;
+      color: white;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
     }
+
+    /* View section styling */
     .view-section {
+      padding: 20px;
+      background-color: #ffffff;
+      margin: 20px auto;
+      border-radius: 8px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      max-width: 800px;
       display: none; /* Hidden by default */
-      margin-top: 20px;
     }
+
     .view-section.active {
       display: block; /* Show the active section */
     }
+
+    /* Headers for sections */
+    .view-section h2 {
+      font-size: 22px;
+      color: #333;
+      margin-bottom: 15px;
+      border-bottom: 2px solid #ddd;
+      padding-bottom: 5px;
+    }
+
+    /* Buttons inside sections */
+    .view-section button {
+      background-color: #007BFF;
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      font-size: 14px;
+      font-weight: bold;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      margin-top: 10px;
+    }
+
+    .view-section button:hover {
+      background-color: #0056b3;
+    }
+
+    .view-section button:active {
+      background-color: #004085;
+    }
+
+    /* Table styling for tabs like XSS Detection */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 20px;
+    }
+
+    th, td {
+      border: 1px solid #ddd;
+      padding: 10px;
+      text-align: left;
+    }
+
+    th {
+      background-color: #f7f7f7;
+      font-weight: bold;
+    }
+
+    td {
+      background-color: #ffffff;
+    }
+
+    /* Alerts and warnings */
+    .alert {
+      background-color: #ffdddd;
+      color: #a94442;
+      border: 1px solid #e6c7c7;
+      padding: 10px;
+      border-radius: 5px;
+      margin-bottom: 15px;
+    }
+
+    /* Network request entries */
     .network-entry {
       margin-bottom: 10px;
       padding: 5px;
       border-bottom: 1px solid #ccc;
     }
+
     .xss-issue {
       color: red;
       font-weight: bold;
     }
+
     .details-content {
       display: none; /* Collapsible content hidden by default */
     }
+
     #diagram-container {
       width: 100%;
       height: 500px;
       border: 1px solid #ddd;
       overflow: hidden;
     }
+
     #malicious-alert {
       color: red;
       font-weight: bold;
       display: none; /* Hidden by default */
       margin-bottom: 15px;
     }
+
     #malicious-list {
       color: red;
       font-weight: bold;
@@ -53,68 +168,44 @@
       list-style-type: none;
       padding-left: 0;
     }
-  
-    /* New CSS for Malicious IP Details Table */
-    .ip-container {
-      border: 1px solid #ccc;
-      margin-bottom: 10px;
-      border-radius: 5px;
-      overflow: hidden;
-      padding: 5px;
-    }
-    .ip-header {
-      background-color: #f8d7da;
-      padding: 10px;
-      cursor: pointer;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .ip-header:hover {
-      background-color: #f5c6cb;
-    }
-    .ip-icon {
-      margin-right: 10px;
-      color: #d9534f;
-    }
-    .toggle-icon {
-      font-size: 12px;
-      color: #555;
-    }
-    .ip-details {
-      padding: 10px;
-      display: none; /* Hidden by default */
-    }
-    .ip-details-table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 10px;
-      font-size: 14px;
-    }
-    .ip-details-table th,
-    .ip-details-table td {
-      border: 1px solid #ccc;
-      padding: 8px;
-      text-align: left;
-    }
-    .ip-details-table th {
-      background-color: #f5f5f5;
-      font-weight: bold;
-    }
+
+    /* Improved form and search container styling */
     #search-container {
-    margin-bottom: 10px;
-    display: flex;
-    gap: 10px;
-    align-items: center;
+      margin-bottom: 15px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
     }
 
     #search-bar {
-        padding: 5px;
-        flex: 1;
+      padding: 8px;
+      flex: 1;
+      font-size: 14px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
     }
 
     #filter-type {
-        padding: 5px;
+      padding: 8px;
+      font-size: 14px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+
+    /* Analysis section box styling */
+    #analysis-section {
+      border: 1px solid #ccc;
+      padding: 15px;
+      margin-top: 15px;
+      background-color: #ffffff;
+      border-radius: 5px;
+    }
+
+    /* MITM alert styling */
+    .mitm-alert {
+      color: red;
+      font-weight: bold;
+      margin-bottom: 10px;
     }
   </style>
 </head>
@@ -128,6 +219,7 @@
     <button id="xss-detection-tab" class="tab-button">XSS Detection</button>
     <button id="threat-correlation-tab" class="tab-button">Threat Correlation</button>
     <button id="flow-diagrams-tab" class="tab-button">Flow Diagrams</button>
+    <button id="analysis-tab" class="tab-button">Analysis</button>
     <button id="report-config-tab" class="tab-button">Report Config</button>
   </div>
 
@@ -188,9 +280,8 @@
     <div id="malicious-list"></div>
   </div>
 
-
-<!-- Flow Diagrams View -->
-<div id="flow-diagrams" class="view-section">
+  <!-- Flow Diagrams View -->
+  <div id="flow-diagrams" class="view-section">
     <h2>Network Request Flow</h2>
     <button id="refresh-diagram">Refresh Diagram</button>
     <div id="diagram-container" style="width: 600px; height: 600px;"></div>
@@ -199,9 +290,12 @@
     <button id="manual-update">Manual Update</button>
     <button id="stop-auto-update">Stop Auto-Update</button>
     <div id="traffic-graph" style="width: 800px; height: 400px; margin-top: 20px;"></div>
+  </div>
 
-
-
+  <div id="analysis-section" class="view-section">
+    <h2>MITM Analysis</h2>
+    <div id="mitm-list"></div>
+  </div>
 
   <!-- Report Config View -->
   <div id="report-config" class="view-section">
