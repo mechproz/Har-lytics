@@ -582,6 +582,7 @@ document.addEventListener("DOMContentLoaded", () => {
         flowData.push({
             source: inspectedHostname || "unknown",
             target: new URL(request.request.url).hostname,
+            timestamp: request.startedDateTime,
             count: 1, // Initialize a count property to track requests
             destIP: request.serverIPAddress || "N/A" // Capture destination IP if available
         });
@@ -744,157 +745,224 @@ document.addEventListener("DOMContentLoaded", () => {
     // ====================================================
 
     // Function to process data into nodes and links for D3.js
-    function prepareData() {
-        const nodesMap = {};
-        const linksMap = {};
+// Function to process and get top connections
+function prepareTopConnections(topN = 5) {
+    const linksMap = {};
 
-        // Process unique nodes and links
-        flowData.forEach(req => {
-            const sourceHost = req.source;
-            const targetHost = req.target;
+    // Count connections between source and target
+    flowData.forEach(req => {
+        const linkKey = `${req.source}->${req.target}`;
+        if (linksMap[linkKey]) {
+            linksMap[linkKey].count += 1;
+        } else {
+            linksMap[linkKey] = {
+                source: req.source,
+                target: req.target,
+                count: 1
+            };
+        }
+    });
 
-            // Add source and target to nodes map if not already present
-            if (!nodesMap[sourceHost]) {
-                nodesMap[sourceHost] = { id: sourceHost };
-            }
-            if (!nodesMap[targetHost]) {
-                nodesMap[targetHost] = { id: targetHost };
-            }
+    // Convert links map to an array and sort by count
+    const sortedLinks = Object.values(linksMap).sort((a, b) => b.count - a.count);
 
-            // Create a unique key for each link between source and target
-            const linkKey = `${sourceHost}->${targetHost}`;
+    // Return only the top N connections
+    return sortedLinks.slice(0, topN);
+}
 
-            // Track link counts by unique source-target pair
-            if (linksMap[linkKey]) {
-                linksMap[linkKey].count += 1;
-            } else {
-                linksMap[linkKey] = {
-                    source: sourceHost, // Use IDs (hostnames) as references
-                    target: targetHost,
-                    count: 1,
-                    destIP: req.destIP
-                };
-            }
-        });
+// Function to render the bar chart
+function renderBarChart() {
+    const topConnections = prepareTopConnections();
 
-        // Convert maps to arrays
-        const nodes = Object.values(nodesMap);
-        const links = Object.values(linksMap);
+    // Clear previous chart
+    d3.select("#diagram-container").selectAll("*").remove();
 
-        return { nodes, links };
+    const width = document.getElementById("diagram-container").clientWidth;
+    const height = document.getElementById("diagram-container").clientHeight;
+    const margin = { top: 20, right: 20, bottom: 50, left: 60 };
+    const chartWidth = width - margin.left - margin.right;
+    const chartHeight = height - margin.top - margin.bottom;
+
+    const svg = d3.select("#diagram-container")
+        .append("svg")
+        .attr("width", width)
+        .attr("height", height);
+
+    const chart = svg.append("g")
+        .attr("transform", `translate(${margin.left},${margin.top})`);
+
+    // Set up scales
+    const x = d3.scaleBand()
+        .domain(topConnections.map(d => `${d.source}->${d.target}`))
+        .range([0, chartWidth])
+        .padding(0.2);
+
+    const y = d3.scaleLinear()
+        .domain([0, d3.max(topConnections, d => d.count)])
+        .nice()
+        .range([chartHeight, 0]);
+
+    // Add axes
+    chart.append("g")
+        .attr("transform", `translate(0,${chartHeight})`)
+        .call(d3.axisBottom(x))
+        .selectAll("text")
+        .attr("transform", "rotate(-45)")
+        .style("text-anchor", "end");
+
+    chart.append("g")
+        .call(d3.axisLeft(y));
+
+    // Add bars
+    chart.selectAll(".bar")
+        .data(topConnections)
+        .enter().append("rect")
+        .attr("class", "bar")
+        .attr("x", d => x(`${d.source}->${d.target}`))
+        .attr("y", d => y(d.count))
+        .attr("width", x.bandwidth())
+        .attr("height", d => chartHeight - y(d.count))
+        .attr("fill", "#4285f4");
+
+    // Add labels to bars
+    chart.selectAll(".label")
+        .data(topConnections)
+        .enter().append("text")
+        .attr("x", d => x(`${d.source}->${d.target}`) + x.bandwidth() / 2)
+        .attr("y", d => y(d.count) - 5)
+        .attr("text-anchor", "middle")
+        .attr("fill", "#333")
+        .text(d => d.count);
+}
+
+
+// Function to prepare the time data, binned by minute
+function prepareTimeData() {
+    const trafficByMinute = new Map();
+
+    // Aggregate data by minute
+    flowData.forEach((req) => {
+        const timestamp = new Date(req.timestamp); // Parse ISO string to Date object
+        const minute = timestamp.toISOString().substring(0, 16); // Extract "YYYY-MM-DDTHH:mm"
+
+        if (trafficByMinute.has(minute)) {
+            trafficByMinute.set(minute, trafficByMinute.get(minute) + 1); // Increment count for the minute
+        } else {
+            trafficByMinute.set(minute, 1); // Initialize count if this minute is new
+        }
+    });
+
+    // Convert Map to array and sort by timestamp
+    const aggregatedTimeData = Array.from(trafficByMinute.entries())
+        .map(([minute, count]) => ({
+            timestamp: new Date(minute), // Convert back to Date object
+            count
+        }))
+        .sort((a, b) => a.timestamp - b.timestamp); // Sort by timestamp
+
+    return aggregatedTimeData;
+}
+
+// Function to render the traffic graph
+function renderTrafficGraph() {
+    const timeData = prepareTimeData(); // Get aggregated data
+
+    if (!timeData || timeData.length === 0) {
+        console.error("No traffic data available");
+        return;
     }
 
-    // Function to render the flow diagram
-    function renderDiagram() {
-        const { nodes, links } = prepareData();
+    const width = document.getElementById("traffic-graph").clientWidth;
+    const height = document.getElementById("traffic-graph").clientHeight;
 
-        // Clear previous diagram
-        d3.select("#diagram-container").selectAll("*").remove();
+    const margin = { top: 20, right: 20, bottom: 30, left: 50 };
+    const chartWidth = width - margin.left - margin.right;
+    const chartHeight = height - margin.top - margin.bottom;
 
-        const width = document.getElementById("diagram-container").clientWidth;
-        const height = document.getElementById("diagram-container").clientHeight;
+    // Clear previous graph
+    d3.select("#traffic-graph").selectAll("*").remove();
 
-        const svg = d3.select("#diagram-container")
-            .append("svg")
-            .attr("width", width)
-            .attr("height", height);
+    const svg = d3.select("#traffic-graph")
+        .append("svg")
+        .attr("width", width)
+        .attr("height", height)
+        .append("g")
+        .attr("transform", `translate(${margin.left},${margin.top})`);
 
-        // Create simulation for force-directed graph
-        const simulation = d3.forceSimulation(nodes)
-            .force("link", d3.forceLink(links).id(d => d.id).distance(150))
-            .force("charge", d3.forceManyBody().strength(-500))
-            .force("center", d3.forceCenter(width / 2, height / 2))
-            .force("collision", d3.forceCollide().radius(50)); // Prevent nodes from overlapping
+    // Set up scales for x (time) and y (request count)
+    const x = d3.scaleTime()
+        .domain(d3.extent(timeData, d => d.timestamp)) // Min and max timestamps
+        .range([0, chartWidth]);
 
-        // Draw links (lines) with variable thickness based on request count
-        const link = svg.append("g")
-            .attr("class", "links")
-            .selectAll("line")
-            .data(links)
-            .enter().append("line")
-            .attr("stroke", "#999")
-            .attr("stroke-opacity", 0.6)
-            .attr("stroke-width", d => Math.sqrt(d.count));
+    const y = d3.scaleLinear()
+        .domain([0, d3.max(timeData, d => d.count) || 1]) // Ensure y-domain has a max of at least 1
+        .nice()
+        .range([chartHeight, 0]);
 
-        // Draw nodes (circles)
-        const node = svg.append("g")
-            .attr("class", "nodes")
-            .selectAll("circle")
-            .data(nodes)
-            .enter().append("circle")
-            .attr("r", 15)
-            .attr("fill", "#4285f4")
-            .call(d3.drag()
-                .on("start", dragstarted)
-                .on("drag", dragged)
-                .on("end", dragended));
+    // Add x-axis (local time formatting)
+    const timeFormat = d3.timeFormat("%H:%M"); // Display as "HH:mm"
+    svg.append("g")
+        .attr("transform", `translate(0,${chartHeight})`)
+        .call(d3.axisBottom(x).tickFormat(d => timeFormat(d)));
 
-        // Display labels on nodes
-        const text = svg.append("g")
-            .attr("class", "labels")
-            .selectAll("text")
-            .data(nodes)
-            .enter().append("text")
-            .attr("dy", -20)
-            .attr("text-anchor", "middle")
-            .text(d => d.id);
+    // Add y-axis
+    svg.append("g")
+        .call(d3.axisLeft(y));
 
-        // Update positions on each tick
-        simulation.on("tick", () => {
-            nodes.forEach(d => {
-                d.x = Math.max(30, Math.min(width - 30, d.x));
-                d.y = Math.max(30, Math.min(height - 30, d.y));
-            });
+    // Line generator for the graph
+    const line = d3.line()
+        .x(d => x(d.timestamp))
+        .y(d => y(d.count));
 
-            link.attr("x1", d => d.source.x)
-                .attr("y1", d => d.source.y)
-                .attr("x2", d => d.target.x)
-                .attr("y2", d => d.target.y);
+    // Draw the line
+    svg.append("path")
+        .datum(timeData)
+        .attr("fill", "none")
+        .attr("stroke", "steelblue")
+        .attr("stroke-width", 2)
+        .attr("d", line);
 
-            node.attr("cx", d => d.x)
-                .attr("cy", d => d.y);
+    // Add data points (circles)
+    svg.selectAll(".dot")
+        .data(timeData)
+        .enter().append("circle")
+        .attr("class", "dot")
+        .attr("cx", d => x(d.timestamp))
+        .attr("cy", d => y(d.count))
+        .attr("r", 3)
+        .attr("fill", "steelblue");
+}
 
-            text.attr("x", d => d.x)
-                .attr("y", d => d.y);
-        });
+// Auto-update the graph every 10 seconds
+let autoUpdateInterval;
+function startAutoUpdate() {
+    clearInterval(autoUpdateInterval);
+    autoUpdateInterval = setInterval(renderTrafficGraph, 10000);
+}
+startAutoUpdate();
 
-        // Drag functions
-        function dragstarted(event, d) {
-            if (!event.active) simulation.alphaTarget(0.3).restart();
-            d.fx = d.x;
-            d.fy = d.y;
-        }
+// Manual update button
+const manualUpdateButton = document.getElementById("manual-update");
+if (manualUpdateButton) {
+    manualUpdateButton.addEventListener("click", renderTrafficGraph);
+}
 
-        function dragged(event, d) {
-            d.fx = event.x;
-            d.fy = event.y;
-        }
+// Stop auto-update button
+const stopAutoUpdateButton = document.getElementById("stop-auto-update");
+if (stopAutoUpdateButton) {
+    stopAutoUpdateButton.addEventListener("click", () => {
+        clearInterval(autoUpdateInterval);
+    });
+}
 
-        function dragended(event, d) {
-            if (!event.active) simulation.alphaTarget(0);
-            d.fx = null;
-            d.fy = null;
-        }
+// Refresh button to re-render the bar chart
+const refreshButton = document.getElementById("refresh-diagram");
+if (refreshButton) {
+    refreshButton.addEventListener("click", renderBarChart);
+}
 
-        // Populate #data-display with textual data
-        const display = document.getElementById("data-display");
-        display.innerHTML = "<h3>Network Request Details</h3>";
-
-        links.forEach(link => {
-            const linkInfo = document.createElement("div");
-            linkInfo.classList.add("link-info");
-            linkInfo.innerHTML = `
-                <p><strong>Origin:</strong> ${link.source.id}</p>
-                <p><strong>Destination:</strong> ${link.target.id}</p>
-                <p><strong>Destination IP:</strong> ${link.destIP}</p>
-                <p><strong>Request Count:</strong> ${link.count}</p>
-            `;
-            display.appendChild(linkInfo);
-        });
-    }
-
-    // Refresh button to re-render the diagram with new data
-    document.getElementById("refresh-diagram").addEventListener("click", renderDiagram);
+// Refresh button to re-render the bar chart
+document.getElementById("refresh-diagram").addEventListener("click", renderBarChart);
 
     // ====================================================
     // Report Generation Functionality
