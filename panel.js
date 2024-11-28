@@ -32,13 +32,28 @@ chrome.devtools.inspectedWindow.eval("window.location.hostname", function(result
 
 // Regular expressions to detect potential XSS patterns
 const XSS_PATTERNS = [
-    /<style[^>]*>.*?[{}]/gi,
-    /<img[^>]+src=['"]?javascript:.*?['"]/gi,
-    /\bon[a-z]+\s*=\s*['"]?[^'"]*(alert|eval|prompt|confirm|document\.cookie|window\.open)['"]/gi,
-    /\bstyle\s*=\s*['"].*expression.*['"]/gi,
-    /\bsrc\s*=\s*['"]javascript:.*['"]/gi,
-    /\bon[a-z]+\s*=\s*['"]?.*?(alert|eval|prompt|document\.cookie|window\.open).*?['"]/gi,
+    /\bon[a-z]+\s*=\s*['"]?[^'"]*(alert|eval|prompt|confirm|document\.cookie|window\.open)['"]/gi, // Matches inline event handlers with potential XSS functions
+    /\bstyle\s*=\s*['"].*expression.*['"]/gi, // Matches styles with expressions (e.g., `expression(alert(1))`)
+    /\bsrc\s*=\s*['"]javascript:.*['"]/gi, // Matches src attributes with javascript: in the value
+    /document\.cookie\s*=/gi, // Matches usage of document.cookie, a common XSS payload
+    /<svg[^>]*><script.*?>.*?<\/script>/gi, // Matches inline <svg> with embedded <script> tags
+    /<body[^>]*onload\s*=\s*['"].*?(alert|eval|prompt|document\.cookie|window\.open).*?['"]/gi, // Matches <body> onload event handlers
+    /<a[^>]+href=['"]?javascript:.*?['"]/gi // Matches <a> tags with javascript: links
 ];
+
+function safeDecode(content) {
+    try {
+        return decodeURIComponent(content);
+    } catch (error) {
+        console.warn("decodeURIComponent failed: Malformed URI", error);
+        return content; // Return the original content if decoding fails
+    }
+}
+
+// Sanitize the input by stripping out any non-HTML or malformed content
+function sanitizeContent(content) {
+    return content.replace(/<\/?[^>]+(>|$)/g, ""); // Strip out tags
+}
 
 // Function to detect XSS patterns in a given text
 function detectXSS(text) {
@@ -48,23 +63,25 @@ function detectXSS(text) {
     }
 
     let issues = [];
-    let decodedText = "";
+    let decodedText = safeDecode(text);
 
-    try {
-        // Attempt to decode the text; fallback to original text if decoding fails
-        decodedText = decodeURIComponent(text);
-    } catch (error) {
-        console.warn("decodeURIComponent failed:", error);
-        decodedText = text; // Fallback to the raw text
-    }
-
-    [text, decodedText].forEach(body => {
-        XSS_PATTERNS.forEach(pattern => {
-            if (pattern.test(body)) {
-                issues.push(pattern.toString());
-            }
-        });
+    // Step 1: Check the original text for XSS patterns
+    XSS_PATTERNS.forEach((pattern) => {
+        console.log("Testing pattern:", pattern);
+        if (pattern.test(text)) {
+            console.log("Pattern match found in text:", pattern);
+            issues.push(pattern.toString());
+        }
     });
+
+    // Step 2: Check the decoded text if there were no issues found yet
+    XSS_PATTERNS.forEach((pattern) => {
+        if (!issues.some(issue => issue === pattern.toString()) && pattern.test(decodedText)) {
+            console.log("Pattern match found in decodedText:", pattern);
+            issues.push(pattern.toString());
+        }
+    });
+
     return issues;
 }
 
