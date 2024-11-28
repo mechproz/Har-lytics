@@ -604,34 +604,42 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // Event listener for auto-save toggle
+    // Event listener for auto-save toggle and interval input
     const toggleAutoSave = document.getElementById("toggle-auto-save");
     const intervalInput = document.getElementById("auto-save-interval");
-    if (toggleAutoSave && intervalInput) {
-        toggleAutoSave.addEventListener("change", () => {
-            const interval = parseInt(intervalInput.value, 10) || 30;
-            if (toggleAutoSave.checked) {
-                startAutoSave(interval);
+    const saveAutoSaveButton = document.getElementById("save-auto-save-settings"); // Save button
+
+    // Ensure the checkbox is unchecked by default
+    toggleAutoSave.checked = false;
+
+    // Listener for "Save Auto Save Settings" button
+    if (saveAutoSaveButton) {
+        saveAutoSaveButton.addEventListener("click", () => {
+            const isAutoSaveEnabled = toggleAutoSave.checked;
+            const interval = parseInt(intervalInput.value, 10) || 1; // Default to 1 minute
+
+            if (isAutoSaveEnabled) {
+                startAutoSave(interval * 60); // Convert minutes to seconds
+                console.log(`Auto-save started with interval: ${interval} minutes.`);
             } else {
                 stopAutoSave();
+                console.log("Auto-save is disabled. No action taken.");
             }
         });
-
-        // Event listener for interval input change
-        intervalInput.addEventListener("change", () => {
-            const interval = parseInt(intervalInput.value, 10) || 30;
-            if (toggleAutoSave.checked) {
-                startAutoSave(interval);
-                console.log(`Auto-save interval updated to ${interval} seconds.`);
-            }
-        });
-
-        // Start auto-save if enabled on load
-        if (toggleAutoSave.checked) {
-            const interval = parseInt(intervalInput.value, 10) || 30;
-            startAutoSave(interval);
-        }
     }
+
+    // Additional listeners (optional, for user feedback)
+    if (toggleAutoSave && intervalInput) {
+        toggleAutoSave.addEventListener("change", () => {
+            console.log(`Auto-save ${toggleAutoSave.checked ? "enabled" : "disabled"} (not yet applied).`);
+        });
+
+        intervalInput.addEventListener("change", () => {
+            const interval = parseInt(intervalInput.value, 10) || 1; // Default to 1 minute
+            console.log(`Auto-save interval set to ${interval} minutes (not yet applied).`);
+        });
+    }
+
 
     // ====================================================
     // Network Request Capture and Processing
