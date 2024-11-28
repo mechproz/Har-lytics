@@ -82,7 +82,7 @@ The **HAR Data Viewer** is a Chrome Developer Tools extension designed for compr
     - Malicious IPs
     - Flow Diagram Data
     - MITM Analysis
-- **HTML Export**: Download a detailed HTML report with visualizations.
+- **HTML Export**: Download a detailed HTML report.
 ![Sample Html Screenshot](images/report.PNG "Network Requests")
 
 
