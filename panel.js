@@ -32,11 +32,12 @@ chrome.devtools.inspectedWindow.eval("window.location.hostname", function(result
 
 // Regular expressions to detect potential XSS patterns
 const XSS_PATTERNS = [
-    /<script\b[^>]*>(.*?)<\/script>/gi,
-    /javascript:/gi,
-    /\bon\w+=\s*(['"]).*?\1/gi,
-    /\beval\s*\(/gi,
-    /\bdocument\.cookie\b/gi
+    /<style[^>]*>.*?[{}]/gi,
+    /<img[^>]+src=['"]?javascript:.*?['"]/gi,
+    /\bon[a-z]+\s*=\s*['"]?[^'"]*(alert|eval|prompt|confirm|document\.cookie|window\.open)['"]/gi,
+    /\bstyle\s*=\s*['"].*expression.*['"]/gi,
+    /\bsrc\s*=\s*['"]javascript:.*['"]/gi,
+    /\bon[a-z]+\s*=\s*['"]?.*?(alert|eval|prompt|document\.cookie|window\.open).*?['"]/gi,
 ];
 
 // Function to detect XSS patterns in a given text
@@ -65,6 +66,18 @@ function detectXSS(text) {
         });
     });
     return issues;
+}
+
+// Function to escape HTML for safe rendering
+function escapeHTML(html) {
+    const div = document.createElement("div");
+    div.innerText = html;
+    return div.innerHTML;
+}
+
+// Function to truncate long text
+function truncateText(text, maxLength = 500) {
+    return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text;
 }
 
 // ====================================================
@@ -370,9 +383,9 @@ function isUnwantedRequest(request) {
 
 // Define timing thresholds for anomaly detection (in milliseconds)
 const TIMING_THRESHOLDS = {
-    dns: 200,         // DNS resolution time
-    connect: 500,     // Connection time
-    totalTime: 1000   // Total request time
+    dns: 2000,         // DNS resolution time
+    connect: 5000,     // Connection time
+    totalTime: 15000   // Total request time
 };
 
 // Function to detect timing anomalies in network requests
@@ -727,6 +740,20 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // XSS Detection Tab
         request.getContent((content) => {
+            // Content-Type Filtering (specific to XSS detection)
+            const contentTypeHeader = request.response.headers.find(
+                header => header.name.toLowerCase() === "content-type"
+            );
+            const contentType = contentTypeHeader ? contentTypeHeader.value : null;
+
+            console.log("XSS Detection - Detected Content-Type:", contentType); // Debugging: Log Content-Type
+
+            // Skip XSS detection if Content-Type is not relevant
+            if (contentType && !/text\/html|application\/javascript|text\/javascript/.test(contentType)) {
+                console.warn("XSS Detection skipped due to irrelevant Content-Type:", contentType);
+                return; // Exit XSS detection for this request
+            }
+
             const xssIssues = detectXSS(content || "") || detectXSS(request.request.postData?.text || "");
 
             if (xssIssues.length > 0) {
@@ -756,14 +783,33 @@ document.addEventListener("DOMContentLoaded", () => {
                 detailsContent.classList.add("details-content");
                 detailsContent.style.display = "none";
 
+                // Escape and truncate content for safe rendering
+                const truncatedBody = truncateText(content || "No content");
+                const escapedBody = escapeHTML(truncatedBody);
+
                 detailsContent.innerHTML = `
-                    <strong>Request URL:</strong> ${request.request.url}<br>
-                    <strong>Request Method:</strong> ${request.request.method}<br>
-                    <strong>Request Headers:</strong> ${request.request.headers.map(header => `${header.name}: ${header.value}`).join("<br>")}<br>
-                    <strong>Response Headers:</strong> ${request.response.headers.map(header => `${header.name}: ${header.value}`).join("<br>")}<br>
-                    <strong>Request Body:</strong><br>${request.request.postData?.text || "No body"}<br>
-                    <strong>Response Body:</strong><br>${content || "No content"}
+                    <strong>Request URL:</strong> ${escapeHTML(request.request.url)}<br>
+                    <strong>Request Method:</strong> ${escapeHTML(request.request.method)}<br>
+                    <strong>Request Headers:</strong> ${escapeHTML(request.request.headers.map(header => `${header.name}: ${header.value}`).join("<br>"))}<br>
+                    <strong>Response Headers:</strong> ${escapeHTML(request.response.headers.map(header => `${header.name}: ${header.value}`).join("<br>"))}<br>
+                    <strong>Request Body:</strong><br>${escapeHTML(request.request.postData?.text || "No body")}<br>
+                    <strong>Response Body:</strong><br><pre>${escapedBody}</pre>
                 `;
+
+                // Add optional iframe for debugging full response (sandboxed)
+                const iframeToggleButton = document.createElement("button");
+                iframeToggleButton.textContent = "View Full Response in iFrame";
+                iframeToggleButton.addEventListener("click", () => {
+                    const iframe = document.createElement("iframe");
+                    iframe.srcdoc = content || "No content";
+                    iframe.style.width = "100%";
+                    iframe.style.height = "400px";
+                    iframe.style.border = "1px solid #ddd";
+                    detailsContent.appendChild(iframe);
+                    iframeToggleButton.style.display = "none"; // Hide button after adding iframe
+                });
+
+                detailsContent.appendChild(iframeToggleButton);
 
                 const expandButton = document.createElement("button");
                 expandButton.textContent = "Expand";
