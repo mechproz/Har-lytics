@@ -222,7 +222,7 @@
   </style>
 </head>
 <body>
-  <h1>Network Request Viewer</h1>
+  <h1>Har-lytics</h1>
 
   <!-- Buttons to toggle between views -->
   <div id="tabs">
@@ -271,6 +271,23 @@
   <!-- XSS Detection View -->
   <div id="xss-detection" class="view-section">
     <h2>XSS Detection</h2>
+
+    <!-- Button to toggle the XSS patterns table -->
+    <!-- <button id="toggle-patterns" onclick="togglePatterns()">Show/Hide XSS Patterns</button> -->
+    <button id="toggle-patterns">Show/Hide XSS Patterns</button>
+
+    <!-- Table to display XSS patterns and descriptions -->
+    <table id="xss-patterns-table" border="1" style="display: none; margin-top: 10px;">
+      <thead>
+        <tr>
+          <th>Pattern</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody id="xss-patterns"></tbody>
+    </table>
+
+    <!-- Table to detect XSS patterns -->
     <table id="xss-detection-table" border="1">
       <thead>
         <tr>

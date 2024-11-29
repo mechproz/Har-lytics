@@ -33,13 +33,46 @@ chrome.devtools.inspectedWindow.eval("window.location.hostname", function(result
 // Regular expressions to detect potential XSS patterns
 const XSS_PATTERNS = [
     /\bon[a-z]+\s*=\s*['"]?[^'"]*(alert|eval|prompt|confirm|document\.cookie|window\.open)['"]/gi, // Matches inline event handlers with potential XSS functions
-    /\bstyle\s*=\s*['"].*expression.*['"]/gi, // Matches styles with expressions (e.g., `expression(alert(1))`)
+    /&lt;script&gt;.*?&lt;\/script&gt;/gi, // Matches HTML-encoded <script> tags
     /\bsrc\s*=\s*['"]javascript:.*['"]/gi, // Matches src attributes with javascript: in the value
     /document\.cookie\s*=/gi, // Matches usage of document.cookie, a common XSS payload
     /<svg[^>]*><script.*?>.*?<\/script>/gi, // Matches inline <svg> with embedded <script> tags
     /<body[^>]*onload\s*=\s*['"].*?(alert|eval|prompt|document\.cookie|window\.open).*?['"]/gi, // Matches <body> onload event handlers
     /<a[^>]+href=['"]?javascript:.*?['"]/gi // Matches <a> tags with javascript: links
 ];
+
+const XSS_PATTERNS_WITH_DESCRIPTIONS = [
+    { pattern: /\bon[a-z]+\s*=\s*['"]?[^'"]*(alert|eval|prompt|confirm|document\.cookie|window\.open)['"]/gi, description: "Matches inline event handlers with potential XSS functions" },
+    { pattern: /&lt;script&gt;.*?&lt;\/script&gt;/gi, description: "Matches HTML-encoded <script> tags" },
+    { pattern: /\bsrc\s*=\s*['"]javascript:.*['"]/gi, description: "Matches src attributes with javascript: in the value" },
+    { pattern: /document\.cookie\s*=/gi, description: "Matches usage of document.cookie, a common XSS payload" },
+    { pattern: /<svg[^>]*><script.*?>.*?<\/script>/gi, description: "Matches inline <svg> with embedded <script> tags" },
+    { pattern: /<body[^>]*onload\s*=\s*['"].*?(alert|eval|prompt|document\.cookie|window\.open).*?['"]/gi, description: "Matches <body> onload event handlers" },
+    { pattern: /<a[^>]+href=['"]?javascript:.*?['"]/gi, description: "Matches <a> tags with javascript: links" }
+];
+
+function togglePatterns() {
+    const patternsTable = document.getElementById('xss-patterns-table');
+    patternsTable.style.display = patternsTable.style.display === 'none' ? 'block' : 'none';
+}
+
+function populatePatternsTable() {
+    const patternsTableBody = document.getElementById('xss-patterns');
+    patternsTableBody.innerHTML = ''; // Clear previous entries
+
+    XSS_PATTERNS_WITH_DESCRIPTIONS.forEach(({ pattern, description }) => {
+        const row = document.createElement('tr');
+        const patternCell = document.createElement('td');
+        const descriptionCell = document.createElement('td');
+
+        patternCell.textContent = pattern;
+        descriptionCell.textContent = description;
+
+        row.appendChild(patternCell);
+        row.appendChild(descriptionCell);
+        patternsTableBody.appendChild(row);
+    });
+}
 
 function safeDecode(content) {
     try {
@@ -762,6 +795,9 @@ document.addEventListener("DOMContentLoaded", () => {
         // ====================================================
         // XSS Detection Processing
         // ====================================================
+
+        document.getElementById('toggle-patterns').addEventListener('click', togglePatterns);
+        populatePatternsTable(); // Ensure the patterns table is populated on load
 
         // XSS Detection Tab
         request.getContent((content) => {
